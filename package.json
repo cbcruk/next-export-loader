@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "scripts": {
+    "build": "pnpm --filter next-export-loader build",
+    "typecheck": "pnpm --filter next-export-loader typecheck",
+    "test": "pnpm --filter next-export-loader test"
+  }
+}
