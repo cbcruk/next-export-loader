@@ -8,6 +8,10 @@
     ".": {
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./eslint-plugin": {
+      "import": "./dist/eslint-plugin.js",
+      "require": "./dist/eslint-plugin.cjs"
     }
   },
   "main": "./dist/index.cjs",
