@@ -4,7 +4,11 @@ export function parseUrl(url: string): ParsedUrlQuery {
   const searchIndex = url.indexOf('?');
   if (searchIndex === -1) return {};
 
-  const search = url.slice(searchIndex + 1);
+  const hashIndex = url.indexOf('#', searchIndex);
+  const search =
+    hashIndex === -1
+      ? url.slice(searchIndex + 1)
+      : url.slice(searchIndex + 1, hashIndex);
   const params = new URLSearchParams(search);
   const query: ParsedUrlQuery = {};
 
