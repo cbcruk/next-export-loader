@@ -3,13 +3,15 @@ import type { ParsedUrlQuery } from 'querystring';
 
 export type LoaderPhase = 'loading' | 'ready' | 'error';
 
-export interface LoaderContext {
-  query: ParsedUrlQuery;
+export interface LoaderContext<TQuery extends ParsedUrlQuery = ParsedUrlQuery> {
+  query: TQuery;
   queryClient: QueryClient;
   signal: AbortSignal;
 }
 
-export type LoaderFn = (ctx: LoaderContext) => Promise<void>;
+export type LoaderFn<TQuery extends ParsedUrlQuery = ParsedUrlQuery> = (
+  ctx: LoaderContext<TQuery>,
+) => Promise<void>;
 
 export interface PageWithLoader {
   loader?: LoaderFn;

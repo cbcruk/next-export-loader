@@ -39,13 +39,15 @@ export default function ItemsPage(): ReactElement {
   );
 }
 
-ItemsPage.loader = defineLoader(async ({ query, queryClient }) => {
-  const items = await queryClient.ensureQueryData(itemsQuery());
+ItemsPage.loader = defineLoader<{ id?: string }>(
+  async ({ query, queryClient }) => {
+    const items = await queryClient.ensureQueryData(itemsQuery());
 
-  if (!query.id && items.length > 0) {
-    throw new RedirectError(`/items?id=${items[0]!.id}`);
-  }
-  if (query.id && !items.some((i) => i.id === query.id)) {
-    throw new RedirectError(`/items?id=${items[0]!.id}`);
-  }
-});
+    if (!query.id && items.length > 0) {
+      throw new RedirectError(`/items?id=${items[0]!.id}`);
+    }
+    if (query.id && !items.some((i) => i.id === query.id)) {
+      throw new RedirectError(`/items?id=${items[0]!.id}`);
+    }
+  },
+);
