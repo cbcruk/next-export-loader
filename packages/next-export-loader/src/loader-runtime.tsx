@@ -9,6 +9,7 @@ import {
 import { useRouter } from 'next/router';
 import { useQueryClient } from '@tanstack/react-query';
 import { isRedirectError } from './redirect-error';
+import { getDevtoolsStore } from './internal/devtools-store';
 import { createNavigationId, isLatestNavigation } from './internal/navigation-id';
 import { parseUrl } from './internal/parse-url';
 import type { LoaderPhase, PageWithLoader } from './internal/types';
@@ -42,6 +43,7 @@ export function LoaderRuntime({
   const queryClientRef = useRef(queryClient);
   queryClientRef.current = queryClient;
   const redirectedToRef = useRef<string | null>(null);
+  const redirectNavIdRef = useRef<number | null>(null);
 
   const [state, setState] = useState<LoaderState>({
     phase: 'loading',
@@ -78,8 +80,16 @@ export function LoaderRuntime({
   );
 
   useEffect(() => {
+    const devtools = getDevtoolsStore();
+    const componentName =
+      Component.displayName ?? Component.name ?? 'Unknown';
+
     if (redirectedToRef.current === router.asPath) {
       redirectedToRef.current = null;
+      if (redirectNavIdRef.current !== null) {
+        devtools?.completeNavigation(redirectNavIdRef.current, 'ready');
+        redirectNavIdRef.current = null;
+      }
       setState({ phase: 'ready', error: null, readyComponent: Component });
       setPhase('ready');
       return;
@@ -96,6 +106,7 @@ export function LoaderRuntime({
       return;
     }
 
+    devtools?.startNavigation(navId, router.asPath, componentName);
     setState((prev) => ({ ...prev, phase: 'loading', error: null }));
     setPhase('loading');
 
@@ -118,11 +129,15 @@ export function LoaderRuntime({
           if (!isLatestNavigation(navId) || cancelled) return;
 
           if (isRedirectError(error)) {
+            devtools?.addRedirect(navId, error.destination);
             currentUrl = error.destination;
             redirectCount++;
             continue;
           }
 
+          const message =
+            error instanceof Error ? error.message : String(error);
+          devtools?.completeNavigation(navId, 'error', message);
           setState({ phase: 'error', error, readyComponent: null });
           setPhase('error');
           return;
@@ -130,6 +145,7 @@ export function LoaderRuntime({
       }
 
       if (redirectCount >= MAX_REDIRECTS) {
+        devtools?.completeNavigation(navId, 'error', 'Too many redirects');
         setState({
           phase: 'error',
           error: new Error('Too many redirects'),
@@ -141,10 +157,12 @@ export function LoaderRuntime({
 
       if (currentUrl !== router.asPath) {
         redirectedToRef.current = currentUrl;
+        redirectNavIdRef.current = navId;
         void routerRef.current.replace(currentUrl);
         return;
       }
 
+      devtools?.completeNavigation(navId, 'ready');
       setState({ phase: 'ready', error: null, readyComponent: Component });
       setPhase('ready');
     };
@@ -154,6 +172,7 @@ export function LoaderRuntime({
     return () => {
       cancelled = true;
       abortController.abort();
+      devtools?.cancelNavigation(navId);
     };
   }, [Component, router.asPath, setPhase]);
 

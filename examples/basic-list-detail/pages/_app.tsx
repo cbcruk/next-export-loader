@@ -1,7 +1,11 @@
 import { useState, type ReactElement } from 'react';
 import type { AppProps } from 'next/app';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { LoaderRuntime, useLoaderPhase } from 'next-export-loader';
+import {
+  LoaderDevtools,
+  LoaderRuntime,
+  useLoaderPhase,
+} from 'next-export-loader';
 
 function ProgressBar(): ReactElement | null {
   const phase = useLoaderPhase();
@@ -64,6 +68,7 @@ export default function App({ Component, pageProps }: AppProps): ReactElement {
         errorFallback={<ErrorView />}
       >
         <Component {...pageProps} />
+        <LoaderDevtools />
       </LoaderRuntime>
     </QueryClientProvider>
   );
