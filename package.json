@@ -3,6 +3,10 @@
   "scripts": {
     "build": "pnpm --filter next-export-loader build",
     "typecheck": "pnpm --filter next-export-loader typecheck",
-    "test": "pnpm --filter next-export-loader test"
+    "test": "pnpm --filter next-export-loader test",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
   }
 }
