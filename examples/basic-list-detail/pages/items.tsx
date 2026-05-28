@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { useRouter } from 'next/router';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { defineLoader, RedirectError } from 'next-export-loader';
+import { defineLoader, PrefetchLink, RedirectError } from 'next-export-loader';
 import { itemsQuery } from '@/queries/items';
 
 export default function ItemsPage(): ReactElement {
@@ -17,19 +17,16 @@ export default function ItemsPage(): ReactElement {
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {items.map((item) => (
             <li key={item.id} style={{ marginBottom: 8 }}>
-              <a
+              <PrefetchLink
                 href={`/items?id=${item.id}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  void router.push(`/items?id=${item.id}`);
-                }}
+                prefetch={[itemsQuery()]}
                 style={{
                   fontWeight: item.id === selectedId ? 'bold' : 'normal',
                   cursor: 'pointer',
                 }}
               >
                 {item.title}
-              </a>
+              </PrefetchLink>
             </li>
           ))}
         </ul>
