@@ -17,6 +17,21 @@ interface ImportSpecifierNode {
   parent: { source: { value: string } };
 }
 
+type RuleSeverity = 'off' | 'warn' | 'error';
+
+/** Minimal ESLint flat-config shape this plugin ships in `configs`. */
+interface FlatConfig {
+  plugins: Record<string, EslintPlugin>;
+  rules: Record<string, RuleSeverity>;
+}
+
+/** The plugin object consumed by ESLint flat config (`eslint.config.js`). */
+interface EslintPlugin {
+  meta: { name: string };
+  rules: Record<string, RuleModule>;
+  configs: Record<string, FlatConfig>;
+}
+
 const noUseQuery: RuleModule = {
   meta: {
     type: 'problem',
@@ -43,6 +58,21 @@ const noUseQuery: RuleModule = {
   },
 };
 
-export const rules = {
-  'no-use-query': noUseQuery,
-} as const;
+const plugin: EslintPlugin = {
+  meta: { name: 'next-export-loader' },
+  rules: {
+    'no-use-query': noUseQuery,
+  },
+  configs: {},
+};
+
+plugin.configs.recommended = {
+  plugins: { 'next-export-loader': plugin },
+  rules: {
+    'next-export-loader/no-use-query': 'error',
+  },
+};
+
+export type { EslintPlugin, FlatConfig };
+export const rules = plugin.rules;
+export default plugin;
