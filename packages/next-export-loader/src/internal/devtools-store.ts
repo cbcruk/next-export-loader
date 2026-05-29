@@ -1,4 +1,4 @@
-import type { LoaderPhase } from './types';
+import type { LoaderPhase } from '../types';
 
 export interface NavigationEntry {
   id: number;

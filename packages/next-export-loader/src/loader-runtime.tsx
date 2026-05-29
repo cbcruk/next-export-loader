@@ -12,7 +12,8 @@ import { isRedirectError } from './redirect-error';
 import { getDevtoolsStore } from './internal/devtools-store';
 import { createNavigationId, isLatestNavigation } from './internal/navigation-id';
 import { parseUrl } from './internal/parse-url';
-import type { LoaderPhase, PageWithLoader } from './internal/types';
+import type { LoaderPhase } from './types';
+import type { PageWithLoader } from './internal/types';
 import { LoaderPhaseContext, type LoaderPhaseStore } from './use-loader-phase';
 
 const MAX_REDIRECTS = 10;

@@ -1,5 +1,5 @@
 import { createContext, useContext, useSyncExternalStore } from 'react';
-import type { LoaderPhase } from './internal/types';
+import type { LoaderPhase } from './types';
 
 export interface LoaderPhaseStore {
   getPhase(): LoaderPhase;
