@@ -31,6 +31,32 @@ interface LoaderState {
   readyComponent: (React.ComponentType & PageWithLoader) | null;
 }
 
+/**
+ * Drives the loader lifecycle for the active page in `_app`.
+ *
+ * Runs the page's `loader` on every navigation and only renders `children`
+ * (the page) once it resolves, guaranteeing the component mounts with its data
+ * already in cache. While the loader runs it shows `fallback`; on a non-redirect
+ * error it shows `errorFallback`. Stale navigations are cancelled so only the
+ * most recent one wins, and {@link RedirectError}s redirect before mount.
+ *
+ * @example
+ * ```tsx
+ * export default function App({ Component, pageProps }: AppProps) {
+ *   return (
+ *     <QueryClientProvider client={queryClient}>
+ *       <LoaderRuntime
+ *         Component={Component}
+ *         fallback={<Spinner />}
+ *         errorFallback={<ErrorPage />}
+ *       >
+ *         <Component {...pageProps} />
+ *       </LoaderRuntime>
+ *     </QueryClientProvider>
+ *   );
+ * }
+ * ```
+ */
 export function LoaderRuntime({
   Component,
   fallback,

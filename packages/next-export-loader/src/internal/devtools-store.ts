@@ -1,14 +1,26 @@
 import type { LoaderPhase } from '../types';
 
+/**
+ * A single recorded navigation, as surfaced by {@link LoaderDevtools}.
+ */
 export interface NavigationEntry {
+  /** Monotonic navigation id; newer navigations have larger ids. */
   id: number;
+  /** URL the navigation started at. */
   url: string;
+  /** URL after following any redirects (equals `url` when none occurred). */
   finalUrl: string;
+  /** Timestamp (ms) when the loader began. */
   startedAt: number;
+  /** Loader duration in ms, or `null` while still loading. */
   duration: number | null;
+  /** Outcome phase, plus `cancelled` for navigations superseded mid-flight. */
   phase: LoaderPhase | 'cancelled';
+  /** Ordered list of redirect destinations the loader threw. */
   redirectChain: string[];
+  /** Error message if the loader failed, otherwise `null`. */
   error: string | null;
+  /** Display name of the page component for this navigation. */
   componentName: string;
 }
 

@@ -110,6 +110,14 @@ function NavigationRow({
   );
 }
 
+/**
+ * Floating dev panel that logs loader navigations for debugging.
+ *
+ * Render it once inside `<LoaderRuntime>` (typically gated to development). It
+ * shows a phase-colored toggle button and a panel listing recent navigations
+ * with their URL, component, duration, redirect chain, and any error. Mounting
+ * it enables the underlying devtools store; omit it in production builds.
+ */
 export function LoaderDevtools(): ReactNode {
   const [isOpen, setIsOpen] = useState(false);
   const store = useMemo(() => enableDevtools(), []);

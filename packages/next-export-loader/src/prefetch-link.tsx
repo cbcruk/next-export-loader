@@ -7,15 +7,41 @@ import {
 
 type NextLinkProps = React.ComponentProps<typeof Link>;
 
+/**
+ * Minimal shape a query must satisfy to be prefetched by {@link PrefetchLink}.
+ * Any object returned by `queryOptions()` is assignable.
+ */
 export interface PrefetchableQuery {
   readonly queryKey: readonly unknown[];
 }
 
+/**
+ * Props for {@link PrefetchLink}: all `next/link` props except `prefetch`,
+ * which is replaced with a list of queries to warm.
+ */
 export interface PrefetchLinkProps
   extends Omit<NextLinkProps, 'prefetch'> {
+  /**
+   * Queries to prefetch on hover/focus, so the destination's loader resolves
+   * from cache. Pass the same `queryOptions()` objects the loader uses.
+   */
   prefetch?: ReadonlyArray<PrefetchableQuery>;
 }
 
+/**
+ * A `next/link` that warms the destination's data on hover or focus.
+ *
+ * For each query in `prefetch`, calls `queryClient.prefetchQuery` on intent, so
+ * the target page's loader hits cache and mounts instantly. All other props are
+ * forwarded to `next/link`; existing `onMouseEnter`/`onFocus` handlers still run.
+ *
+ * @example
+ * ```tsx
+ * <PrefetchLink href="/items" prefetch={[itemsQuery()]}>
+ *   Items
+ * </PrefetchLink>
+ * ```
+ */
 export function PrefetchLink({
   prefetch,
   onMouseEnter,
