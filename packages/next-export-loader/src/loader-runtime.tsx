@@ -69,8 +69,7 @@ export function LoaderRuntime({
   routerRef.current = router;
   const queryClientRef = useRef(queryClient);
   queryClientRef.current = queryClient;
-  const redirectedToRef = useRef<string | null>(null);
-  const redirectNavIdRef = useRef<number | null>(null);
+  const redirectCountRef = useRef(0);
 
   const [state, setState] = useState<LoaderState>({
     phase: 'loading',
@@ -111,23 +110,13 @@ export function LoaderRuntime({
     const componentName =
       Component.displayName ?? Component.name ?? 'Unknown';
 
-    if (redirectedToRef.current === router.asPath) {
-      redirectedToRef.current = null;
-      if (redirectNavIdRef.current !== null) {
-        devtools?.completeNavigation(redirectNavIdRef.current, 'ready');
-        redirectNavIdRef.current = null;
-      }
-      setState({ phase: 'ready', error: null, readyComponent: Component });
-      setPhase('ready');
-      return;
-    }
-
     let cancelled = false;
     const abortController = new AbortController();
     const navId = createNavigationId();
 
     const loader = Component.loader;
     if (!loader) {
+      redirectCountRef.current = 0;
       setState({ phase: 'ready', error: null, readyComponent: Component });
       setPhase('ready');
       return;
@@ -138,57 +127,49 @@ export function LoaderRuntime({
     setPhase('loading');
 
     const run = async (): Promise<void> => {
-      let currentUrl = router.asPath;
-      let redirectCount = 0;
+      try {
+        const query = parseUrl(router.asPath);
+        await loader({
+          query,
+          queryClient: queryClientRef.current,
+          signal: abortController.signal,
+        });
+      } catch (error: unknown) {
+        if (!isLatestNavigation(navId) || cancelled) return;
 
-      while (redirectCount < MAX_REDIRECTS) {
-        try {
-          const query = parseUrl(currentUrl);
-          await loader({
-            query,
-            queryClient: queryClientRef.current,
-            signal: abortController.signal,
-          });
-
-          if (!isLatestNavigation(navId) || cancelled) return;
-          break;
-        } catch (error: unknown) {
-          if (!isLatestNavigation(navId) || cancelled) return;
-
-          if (isRedirectError(error)) {
-            devtools?.addRedirect(navId, error.destination);
-            currentUrl = error.destination;
-            redirectCount++;
-            continue;
+        if (isRedirectError(error)) {
+          redirectCountRef.current += 1;
+          if (redirectCountRef.current > MAX_REDIRECTS) {
+            redirectCountRef.current = 0;
+            devtools?.completeNavigation(navId, 'error', 'Too many redirects');
+            setState({
+              phase: 'error',
+              error: new Error('Too many redirects'),
+              readyComponent: null,
+            });
+            setPhase('error');
+            return;
           }
-
-          const message =
-            error instanceof Error ? error.message : String(error);
-          devtools?.completeNavigation(navId, 'error', message);
-          setState({ phase: 'error', error, readyComponent: null });
-          setPhase('error');
+          devtools?.addRedirect(navId, error.destination);
+          if (error.replace) {
+            void routerRef.current.replace(error.destination);
+          } else {
+            void routerRef.current.push(error.destination);
+          }
           return;
         }
-      }
 
-      if (redirectCount >= MAX_REDIRECTS) {
-        devtools?.completeNavigation(navId, 'error', 'Too many redirects');
-        setState({
-          phase: 'error',
-          error: new Error('Too many redirects'),
-          readyComponent: null,
-        });
+        const message =
+          error instanceof Error ? error.message : String(error);
+        devtools?.completeNavigation(navId, 'error', message);
+        setState({ phase: 'error', error, readyComponent: null });
         setPhase('error');
         return;
       }
 
-      if (currentUrl !== router.asPath) {
-        redirectedToRef.current = currentUrl;
-        redirectNavIdRef.current = navId;
-        void routerRef.current.replace(currentUrl);
-        return;
-      }
+      if (!isLatestNavigation(navId) || cancelled) return;
 
+      redirectCountRef.current = 0;
       devtools?.completeNavigation(navId, 'ready');
       setState({ phase: 'ready', error: null, readyComponent: Component });
       setPhase('ready');
