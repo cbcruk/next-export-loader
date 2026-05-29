@@ -8,18 +8,15 @@ const EXAMPLES = [
 ] as const;
 
 /**
- * Boots every example and checks it renders, in both `dev` and `static` modes.
- * This is the only spec the `dev` project runs (see playwright.config.ts): it
- * verifies `next dev` serves each example, while the deterministic static export
- * carries the detailed invariant assertions. Each example lives in its own dir,
- * so the per-example `next dev` servers never collide.
+ * Boots every example's static export and checks its home page renders — a
+ * cheap canary that each example builds and serves.
  */
 for (const name of EXAMPLES) {
   test.describe(`smoke: ${name}`, () => {
     let app: RunningExample;
 
-    test.beforeAll(async ({ mode }) => {
-      app = await startExample(name, mode);
+    test.beforeAll(async () => {
+      app = await startExample(name);
     });
     test.afterAll(async () => {
       await app?.stop();

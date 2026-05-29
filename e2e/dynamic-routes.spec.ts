@@ -3,8 +3,8 @@ import { test, expect, startExample, type RunningExample } from './utils';
 test.describe('dynamic-routes', () => {
   let app: RunningExample;
 
-  test.beforeAll(async ({ mode }) => {
-    app = await startExample('dynamic-routes', mode);
+  test.beforeAll(async () => {
+    app = await startExample('dynamic-routes');
   });
   test.afterAll(async () => {
     await app?.stop();

@@ -3,10 +3,13 @@
   "scripts": {
     "build": "pnpm --filter next-export-loader build",
     "typecheck": "pnpm --filter next-export-loader typecheck",
+    "typecheck:e2e": "tsc -p e2e/tsconfig.json",
     "test": "pnpm --filter next-export-loader test",
     "test:e2e": "playwright test"
   },
   "devDependencies": {
-    "@playwright/test": "^1.60.0"
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^25.9.1",
+    "typescript": "^5.9.3"
   }
 }

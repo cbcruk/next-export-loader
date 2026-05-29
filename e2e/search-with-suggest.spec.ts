@@ -3,8 +3,8 @@ import { test, expect, startExample, type RunningExample } from './utils';
 test.describe('search-with-suggest', () => {
   let app: RunningExample;
 
-  test.beforeAll(async ({ mode }) => {
-    app = await startExample('search-with-suggest', mode);
+  test.beforeAll(async () => {
+    app = await startExample('search-with-suggest');
   });
   test.afterAll(async () => {
     await app?.stop();

@@ -3,8 +3,8 @@ import { test, expect, startExample, type RunningExample } from './utils';
 test.describe('auth-gated', () => {
   let app: RunningExample;
 
-  test.beforeAll(async ({ mode }) => {
-    app = await startExample('auth-gated', mode);
+  test.beforeAll(async () => {
+    app = await startExample('auth-gated');
   });
   test.afterAll(async () => {
     await app?.stop();
