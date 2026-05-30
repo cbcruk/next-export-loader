@@ -1,23 +1,15 @@
-import { test, expect, startExample, type RunningExample } from './utils';
+import { describeExample, expect } from './utils';
+
+const test = describeExample('auth-gated');
 
 test.describe('auth-gated', () => {
-  let app: RunningExample;
-
-  test.beforeAll(async () => {
-    app = await startExample('auth-gated');
-  });
-  test.afterAll(async () => {
-    await app?.stop();
-  });
-
   test.describe('invariant 3: redirect happens before mount', () => {
     test('unauthenticated dashboard access redirects to login', async ({
       page,
+      app,
     }) => {
       await page.goto(`${app.baseURL}/dashboard`);
-      await expect(
-        page.getByRole('heading', { name: 'Login' }),
-      ).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Login' })).toBeVisible();
       expect(page.url()).toContain('/login');
       // The protected component never mounted.
       await expect(
@@ -27,6 +19,7 @@ test.describe('auth-gated', () => {
 
     test('dashboard mounts with profile data after login', async ({
       page,
+      app,
     }) => {
       await page.goto(`${app.baseURL}/login`);
       await page.getByRole('button', { name: 'Login' }).click();

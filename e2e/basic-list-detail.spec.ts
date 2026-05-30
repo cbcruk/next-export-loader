@@ -1,17 +1,10 @@
-import { test, expect, startExample, type RunningExample } from './utils';
+import { describeExample, expect } from './utils';
+
+const test = describeExample('basic-list-detail');
 
 test.describe('basic-list-detail', () => {
-  let app: RunningExample;
-
-  test.beforeAll(async () => {
-    app = await startExample('basic-list-detail');
-  });
-  test.afterAll(async () => {
-    await app?.stop();
-  });
-
   test.describe('invariant 1: loader completes before component mount', () => {
-    test('shows loading state before loader completes', async ({ page }) => {
+    test('shows loading state before loader completes', async ({ page, app }) => {
       await page.goto(`${app.baseURL}/items`);
       await expect(page.getByText('Loading...')).toBeVisible();
       await expect(
@@ -22,6 +15,7 @@ test.describe('basic-list-detail', () => {
 
     test('page without loader renders without loading state', async ({
       page,
+      app,
     }) => {
       await page.goto(`${app.baseURL}/`);
       await expect(
@@ -34,6 +28,7 @@ test.describe('basic-list-detail', () => {
   test.describe('invariant 2: navigation race — latest wins', () => {
     test('navigating away during loader cancels the load', async ({
       page,
+      app,
     }) => {
       await page.goto(`${app.baseURL}/`);
       await expect(
@@ -49,7 +44,10 @@ test.describe('basic-list-detail', () => {
       ).toBeVisible();
     });
 
-    test('rapid item clicks resolve to the last clicked', async ({ page }) => {
+    test('rapid item clicks resolve to the last clicked', async ({
+      page,
+      app,
+    }) => {
       await page.goto(`${app.baseURL}/items`);
       await expect(
         page.locator('main').getByRole('heading', { name: 'Apple' }),
@@ -66,7 +64,10 @@ test.describe('basic-list-detail', () => {
   });
 
   test.describe('invariant 3: redirect happens before mount', () => {
-    test('redirects to first item when no id provided', async ({ page }) => {
+    test('redirects to first item when no id provided', async ({
+      page,
+      app,
+    }) => {
       await page.goto(`${app.baseURL}/items`);
       await expect(
         page.locator('main').getByRole('heading', { name: 'Apple' }),
@@ -76,6 +77,7 @@ test.describe('basic-list-detail', () => {
 
     test('redirects to first item when invalid id provided', async ({
       page,
+      app,
     }) => {
       await page.goto(`${app.baseURL}/items?id=999`);
       await expect(
@@ -86,6 +88,7 @@ test.describe('basic-list-detail', () => {
 
     test('redirects after client-side navigation from home', async ({
       page,
+      app,
     }) => {
       await page.goto(`${app.baseURL}/`);
       await page.click('a:has-text("Go to Items")');
@@ -97,7 +100,10 @@ test.describe('basic-list-detail', () => {
   });
 
   test.describe('invariant 4: cache hit — no loading on item switch', () => {
-    test('switching items does not show loading state', async ({ page }) => {
+    test('switching items does not show loading state', async ({
+      page,
+      app,
+    }) => {
       await page.goto(`${app.baseURL}/items`);
       await expect(
         page.locator('main').getByRole('heading', { name: 'Apple' }),

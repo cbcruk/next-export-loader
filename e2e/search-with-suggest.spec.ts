@@ -1,21 +1,20 @@
-import { test, expect, startExample, type RunningExample } from './utils';
+import { describeExample, expect } from './utils';
+
+const test = describeExample('search-with-suggest');
 
 test.describe('search-with-suggest', () => {
-  let app: RunningExample;
-
-  test.beforeAll(async () => {
-    app = await startExample('search-with-suggest');
-  });
-  test.afterAll(async () => {
-    await app?.stop();
-  });
-
-  test('loader prefetches the full list on first load', async ({ page }) => {
+  test('loader prefetches the full list on first load', async ({
+    page,
+    app,
+  }) => {
     await page.goto(`${app.baseURL}/search`);
     await expect(page.getByText('8 results')).toBeVisible();
   });
 
-  test('searching narrows the results via the loader', async ({ page }) => {
+  test('searching narrows the results via the loader', async ({
+    page,
+    app,
+  }) => {
     await page.goto(`${app.baseURL}/search`);
     await expect(page.getByText('8 results')).toBeVisible();
 
@@ -29,6 +28,7 @@ test.describe('search-with-suggest', () => {
   test.describe('invariant 2: navigation race — latest query wins', () => {
     test('rapid searches resolve to the last submitted query', async ({
       page,
+      app,
     }) => {
       await page.goto(`${app.baseURL}/search`);
       await expect(page.getByText('8 results')).toBeVisible();

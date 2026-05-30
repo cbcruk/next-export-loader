@@ -1,4 +1,4 @@
-import { test, expect, startExample, type RunningExample } from './utils';
+import { describeExample, expect } from './utils';
 
 const EXAMPLES = [
   'auth-gated',
@@ -12,17 +12,10 @@ const EXAMPLES = [
  * cheap canary that each example builds and serves.
  */
 for (const name of EXAMPLES) {
+  const test = describeExample(name);
+
   test.describe(`smoke: ${name}`, () => {
-    let app: RunningExample;
-
-    test.beforeAll(async () => {
-      app = await startExample(name);
-    });
-    test.afterAll(async () => {
-      await app?.stop();
-    });
-
-    test('home page boots and renders a heading', async ({ page }) => {
+    test('home page boots and renders a heading', async ({ page, app }) => {
       await page.goto(`${app.baseURL}/`);
       await expect(page.locator('h1').first()).toBeVisible();
     });

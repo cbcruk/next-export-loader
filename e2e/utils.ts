@@ -121,3 +121,21 @@ export const test = base.extend<Record<never, never>>({
     ).toEqual([]);
   },
 });
+
+/**
+ * Returns a `test` bound to one example's static server, started once per worker
+ * and stopped at teardown. Specs get the running server via the `app` fixture
+ * (`async ({ page, app }) => …`) instead of repeating beforeAll/afterAll.
+ */
+export function describeExample(name: string) {
+  return test.extend<Record<never, never>, { app: RunningExample }>({
+    app: [
+      async ({}, use) => {
+        const app = await startExample(name);
+        await use(app);
+        await app.stop();
+      },
+      { scope: 'worker' },
+    ],
+  });
+}

@@ -1,16 +1,9 @@
-import { test, expect, startExample, type RunningExample } from './utils';
+import { describeExample, expect } from './utils';
+
+const test = describeExample('dynamic-routes');
 
 test.describe('dynamic-routes', () => {
-  let app: RunningExample;
-
-  test.beforeAll(async () => {
-    app = await startExample('dynamic-routes');
-  });
-  test.afterAll(async () => {
-    await app?.stop();
-  });
-
-  test('loads a post detail by query id', async ({ page }) => {
+  test('loads a post detail by query id', async ({ page, app }) => {
     await page.goto(`${app.baseURL}/posts/detail?id=1`);
     await expect(
       page.getByRole('heading', { name: 'Hello World' }),
@@ -18,23 +11,20 @@ test.describe('dynamic-routes', () => {
   });
 
   test.describe('invariant 3: redirect happens before mount', () => {
-    test('missing id redirects to the posts list', async ({ page }) => {
+    test('missing id redirects to the posts list', async ({ page, app }) => {
       await page.goto(`${app.baseURL}/posts/detail`);
-      await expect(
-        page.getByRole('heading', { name: 'Posts' }),
-      ).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Posts' })).toBeVisible();
       expect(page.url()).toContain('/posts');
       expect(page.url()).not.toContain('/detail');
     });
   });
 
   test.describe('loader error renders errorFallback (not the component)', () => {
-    test('unknown id shows the Not Found fallback', async ({ page }) => {
+    test('unknown id shows the Not Found fallback', async ({ page, app }) => {
       await page.goto(`${app.baseURL}/posts/detail?id=999`);
       await expect(
         page.getByRole('heading', { name: 'Not Found' }),
       ).toBeVisible();
-      // The detail component must not have mounted with empty data.
       await expect(page.getByText('Back to posts')).toBeVisible();
     });
   });

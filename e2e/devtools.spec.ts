@@ -1,16 +1,9 @@
-import { test, expect, startExample, type RunningExample } from './utils';
+import { describeExample, expect } from './utils';
+
+const test = describeExample('basic-list-detail');
 
 test.describe('LoaderDevtools', () => {
-  let app: RunningExample;
-
-  test.beforeAll(async () => {
-    app = await startExample('basic-list-detail');
-  });
-  test.afterAll(async () => {
-    await app?.stop();
-  });
-
-  test('toggle button stays visible across phases', async ({ page }) => {
+  test('toggle button stays visible across phases', async ({ page, app }) => {
     await page.goto(`${app.baseURL}/items`);
     await expect(
       page.locator('main').getByRole('heading', { name: 'Apple' }),
@@ -20,6 +13,7 @@ test.describe('LoaderDevtools', () => {
 
   test('logs navigations from the very first one, with redirect chains', async ({
     page,
+    app,
   }) => {
     await page.goto(`${app.baseURL}/items`);
     await expect(
@@ -37,7 +31,10 @@ test.describe('LoaderDevtools', () => {
     await expect(page.getByText(/↳\s*\/items\?id=1/)).toBeVisible();
   });
 
-  test('appends an entry on each client-side navigation', async ({ page }) => {
+  test('appends an entry on each client-side navigation', async ({
+    page,
+    app,
+  }) => {
     await page.goto(`${app.baseURL}/items`);
     await expect(
       page.locator('main').getByRole('heading', { name: 'Apple' }),
