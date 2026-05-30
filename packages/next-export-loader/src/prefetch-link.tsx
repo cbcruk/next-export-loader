@@ -3,6 +3,7 @@ import Link from 'next/link';
 import {
   useQueryClient,
   type FetchQueryOptions,
+  type QueryClient,
 } from '@tanstack/react-query';
 
 type NextLinkProps = React.ComponentProps<typeof Link>;
@@ -13,6 +14,23 @@ type NextLinkProps = React.ComponentProps<typeof Link>;
  */
 export interface PrefetchableQuery {
   readonly queryKey: readonly unknown[];
+}
+
+/**
+ * Warms the cache for each query via `queryClient.prefetchQuery`. Extracted as a
+ * pure function so the dispatch logic is unit-testable without rendering; the
+ * component just wires it to hover/focus. A nullish/empty list is a no-op.
+ */
+export function prefetchQueries(
+  queryClient: QueryClient,
+  queries: ReadonlyArray<PrefetchableQuery> | undefined,
+): void {
+  if (!queries) return;
+  for (const opts of queries) {
+    // queryOptions() output is a superset of FetchQueryOptions at runtime;
+    // generic variance prevents direct assignability at the type level
+    void queryClient.prefetchQuery(opts as FetchQueryOptions);
+  }
 }
 
 /**
@@ -51,12 +69,7 @@ export function PrefetchLink({
   const queryClient = useQueryClient();
 
   const handlePrefetch = useCallback(() => {
-    if (!prefetch) return;
-    for (const opts of prefetch) {
-      // queryOptions() output is a superset of FetchQueryOptions at runtime;
-      // generic variance prevents direct assignability at the type level
-      void queryClient.prefetchQuery(opts as FetchQueryOptions);
-    }
+    prefetchQueries(queryClient, prefetch);
   }, [prefetch, queryClient]);
 
   return (
