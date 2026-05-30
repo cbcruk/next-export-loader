@@ -13,6 +13,8 @@ function ProgressBar(): ReactElement | null {
   if (phase !== 'loading') return null;
   return (
     <div
+      role="progressbar"
+      aria-label="Loading page"
       style={{
         position: 'fixed',
         top: 0,
