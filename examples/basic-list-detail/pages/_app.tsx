@@ -1,5 +1,6 @@
 import { useState, type ReactElement } from 'react';
 import type { AppProps } from 'next/app';
+import Link from 'next/link';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   LoaderDevtools,
@@ -43,6 +44,27 @@ function ErrorView(): ReactElement {
   );
 }
 
+// Persistent app shell rendered OUTSIDE LoaderRuntime, so it stays mounted
+// across every loader phase. This lets you navigate away while a loader is
+// still in flight (the page content is replaced by the fallback, but the nav
+// is not) — which is exactly the navigation-race scenario.
+function AppNav(): ReactElement {
+  return (
+    <nav
+      style={{
+        display: 'flex',
+        gap: 16,
+        padding: '12px 32px',
+        borderBottom: '1px solid #eee',
+      }}
+    >
+      <Link href="/">Home</Link>
+      <Link href="/items">Items</Link>
+      <Link href="/slow">Slow page</Link>
+    </nav>
+  );
+}
+
 export default function App({ Component, pageProps }: AppProps): ReactElement {
   const [queryClient] = useState(
     () =>
@@ -62,6 +84,7 @@ export default function App({ Component, pageProps }: AppProps): ReactElement {
           100% { transform: translateX(100%); }
         }
       `}</style>
+      <AppNav />
       <LoaderRuntime
         Component={Component}
         fallback={<PageSkeleton />}
