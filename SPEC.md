@@ -171,17 +171,21 @@ next-export-loader/
 │   └── next-export-loader/
 │       ├── src/
 │       │   ├── index.ts                 ← public API barrel
+│       │   ├── types.ts                 ← public 도메인 타입 (LoaderContext 등)
 │       │   ├── define-loader.ts
 │       │   ├── redirect-error.ts
 │       │   ├── loader-runtime.tsx       ← <LoaderRuntime>
+│       │   ├── loader-devtools.tsx      ← <LoaderDevtools>
 │       │   ├── prefetch-link.tsx
 │       │   ├── use-loader-phase.ts
+│       │   ├── eslint-plugin.ts         ← no-use-query rule
+│       │   ├── *.test.ts                ← node:test, co-located
 │       │   └── internal/
 │       │       ├── parse-url.ts
 │       │       ├── navigation-id.ts     ← race 방지용
-│       │       └── types.ts
-│       ├── test/
-│       │   └── *.test.ts                ← node:test 기반
+│       │       ├── devtools-store.ts
+│       │       ├── types.ts             ← internal 전용 타입
+│       │       └── *.test.ts
 │       ├── package.json
 │       └── tsup.config.ts
 │
@@ -189,49 +193,53 @@ next-export-loader/
 │   ├── basic-list-detail/               ← 메인 예시 (첫 아이템 default selected)
 │   ├── search-with-suggest/             ← searchParam-driven query
 │   ├── auth-gated/                      ← redirect 패턴
-│   └── dynamic-routes/                  ← [id] 페이지의 404 처리
+│   └── dynamic-routes/                  ← query-param 페이지의 errorFallback
+│
+├── e2e/                                 ← Playwright (정적 export 대상)
+│   ├── *.spec.ts
+│   ├── utils.ts                         ← zero-dep 정적 서버 harness
+│   └── global-setup.ts
 │
 ├── docs/
-│   ├── 01-why.md
-│   ├── 02-architecture.md
-│   ├── 03-recipes.md
-│   ├── 04-limitations.md
-│   └── 05-migrating-from-useeffect.md
+│   ├── eslint-plugin.md
+│   └── migrating-to-tanstack-router.md
 │
 ├── README.md
 ├── SPEC.md                              ← this file
 ├── CLAUDE.md
+├── playwright.config.ts
 ├── pnpm-workspace.yaml
 └── package.json
 ```
 
 ## 로드맵
 
-### Phase 1 — Minimum viable (1-2주)
+### Phase 1 — Minimum viable
 
 목표: 핵심 invariant를 만족하는 동작하는 라이브러리.
 
-- [ ] `defineLoader`, `RedirectError`, `LoaderRuntime` 구현
-- [ ] navigation race 방지 (navigation id 패턴)
-- [ ] `examples/basic-list-detail` 동작
-- [ ] README + SPEC.md + CLAUDE.md
-- [ ] Phase 1 publish (npm, GitHub)
+- [x] `defineLoader`, `RedirectError`, `LoaderRuntime` 구현
+- [x] navigation race 방지 (navigation id 패턴)
+- [x] `examples/basic-list-detail` 동작
+- [x] README + SPEC.md + CLAUDE.md
+- [ ] Phase 1 publish (npm, GitHub) — GitHub 공개 진행 중, npm publish 미진행
 
-### Phase 2 — Practical (반응 보고 진행)
+### Phase 2 — Practical
 
 목표: 실전 사용에 필요한 디테일.
 
-- [ ] `<PrefetchLink>` (hover/focus prefetch)
-- [ ] AbortSignal 통합 (loader 진행 중 navigation 취소 시 fetch abort)
-- [ ] `useLoaderPhase()` + 글로벌 progress 예시
-- [ ] ESLint rule: `no-use-query` (`useSuspenseQuery`만 허용)
-- [ ] `examples/` 나머지 3개
+- [x] `<PrefetchLink>` (hover/focus prefetch)
+- [x] AbortSignal 통합 (`LoaderContext.signal` 제공; loader가 `ensureQueryData`에 forward) — runtime은 navigation 취소 시 abort. examples는 아직 signal을 forward하지 않음
+- [x] `useLoaderPhase()` + 글로벌 progress 예시 (basic-list-detail ProgressBar)
+- [x] ESLint rule: `no-use-query` (`useSuspenseQuery`만 허용)
+- [x] `examples/` 나머지 3개
 
 ### Phase 3 — Polish
 
-- [ ] Devtools (현재 phase, navigation log, redirect chain 시각화)
-- [ ] TanStack Router로의 마이그레이션 가이드 (졸업 경로)
-- [ ] `defineLoader` 결과의 search params 타입 추론 강화
+- [x] Devtools (현재 phase, navigation log, redirect chain 시각화)
+- [x] TanStack Router로의 마이그레이션 가이드 (졸업 경로)
+- [x] `defineLoader` 결과의 search params 타입 추론 강화
+- [x] Playwright e2e (정적 export 대상, invariant별 커버)
 
 ## Non-goals
 
