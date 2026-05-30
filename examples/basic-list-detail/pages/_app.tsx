@@ -68,8 +68,8 @@ export default function App({ Component, pageProps }: AppProps): ReactElement {
         errorFallback={<ErrorView />}
       >
         <Component {...pageProps} />
-        <LoaderDevtools />
       </LoaderRuntime>
+      <LoaderDevtools />
     </QueryClientProvider>
   );
 }

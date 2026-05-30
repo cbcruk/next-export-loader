@@ -9,7 +9,6 @@ import {
   enableDevtools,
   type NavigationEntry,
 } from './internal/devtools-store';
-import { useLoaderPhase } from './use-loader-phase';
 
 const PHASE_COLORS = {
   loading: '#eab308',
@@ -113,15 +112,25 @@ function NavigationRow({
 /**
  * Floating dev panel that logs loader navigations for debugging.
  *
- * Render it once inside `<LoaderRuntime>` (typically gated to development). It
- * shows a phase-colored toggle button and a panel listing recent navigations
- * with their URL, component, duration, redirect chain, and any error. Mounting
- * it enables the underlying devtools store; omit it in production builds.
+ * Render it once anywhere under your `QueryClientProvider` — typically as a
+ * sibling of `<LoaderRuntime>`, gated to development. It is self-contained
+ * (reads only the global devtools store), so it stays mounted across every
+ * phase and captures navigations from the very first one. It shows a
+ * phase-colored toggle button and a panel listing recent navigations with their
+ * URL, component, duration, redirect chain, and any error. Mounting it enables
+ * the underlying devtools store; omit it in production builds.
+ *
+ * @example
+ * ```tsx
+ * <LoaderRuntime Component={Component} fallback={…} errorFallback={…}>
+ *   <Component {...pageProps} />
+ * </LoaderRuntime>
+ * {process.env.NODE_ENV !== 'production' && <LoaderDevtools />}
+ * ```
  */
 export function LoaderDevtools(): ReactNode {
   const [isOpen, setIsOpen] = useState(false);
   const store = useMemo(() => enableDevtools(), []);
-  const phase = useLoaderPhase();
 
   const subscribe = useMemo(
     () => store.subscribe.bind(store),
@@ -142,7 +151,7 @@ export function LoaderDevtools(): ReactNode {
     [],
   );
 
-  const phaseColor = PHASE_COLORS[phase];
+  const phaseColor = PHASE_COLORS[entries[0]?.phase ?? 'ready'];
   const panelHeight = 280;
 
   return (
