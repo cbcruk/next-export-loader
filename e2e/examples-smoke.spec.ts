@@ -4,6 +4,7 @@ const EXAMPLES = [
   'auth-gated',
   'basic-list-detail',
   'dynamic-routes',
+  'permission-gated',
   'search-with-suggest',
 ] as const;
 

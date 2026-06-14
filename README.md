@@ -153,6 +153,7 @@ Runnable apps in [`examples/`](examples/):
 | --- | --- |
 | [`basic-list-detail`](examples/basic-list-detail) | Loader basics, cache hits, navigation race, progress bar, devtools |
 | [`auth-gated`](examples/auth-gated) | Redirect-before-mount auth gating |
+| [`permission-gated`](examples/permission-gated) | Permission-based guards over a router-agnostic core: guard factory, redirect-return, 3-state session, token refresh |
 | [`dynamic-routes`](examples/dynamic-routes) | Query-param routes, `errorFallback` on a failed loader |
 | [`search-with-suggest`](examples/search-with-suggest) | Per-query keys and search-driven navigation races |
 
