@@ -161,6 +161,7 @@ Runnable apps in [`examples/`](examples/):
 
 - [ESLint plugin](docs/eslint-plugin.md) — install and configure `no-use-query`.
 - [Migrating to TanStack Router](docs/migrating-to-tanstack-router.md) — when you outgrow static export.
+- [Instant navigation & the same-component loading gap](docs/instant-navigation.md) — a design note on a known same-component navigation bug and the proposed fix.
 
 ## Status
 
