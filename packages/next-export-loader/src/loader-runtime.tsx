@@ -29,6 +29,14 @@ interface LoaderState {
   phase: LoaderPhase;
   error: unknown;
   readyComponent: (React.ComponentType & PageWithLoader) | null;
+  /**
+   * The `router.asPath` the loader last resolved for. Readiness is tracked per
+   * navigation, not just per component: a same-component param change
+   * (/items?id=1 → ?id=999) must re-run the loader before the page renders the
+   * new param, or the page would render stale/invalid state — and crash, or
+   * skip a redirect — before the loader settles.
+   */
+  readyPath: string | null;
 }
 
 /**
@@ -75,13 +83,23 @@ export function LoaderRuntime({
     phase: 'loading',
     error: null,
     readyComponent: null,
+    readyPath: null,
   });
 
+  // Synchronously fall back to loading when the navigation target changes —
+  // either a different component OR a same-component param change. Doing this
+  // during render (not in the effect) keeps the page from rendering the new
+  // param for even one commit before the loader has validated it.
   if (
     state.readyComponent !== null &&
-    state.readyComponent !== Component
+    (state.readyComponent !== Component || state.readyPath !== router.asPath)
   ) {
-    setState({ phase: 'loading', error: null, readyComponent: null });
+    setState({
+      phase: 'loading',
+      error: null,
+      readyComponent: null,
+      readyPath: null,
+    });
   }
 
   const listenersRef = useRef(new Set<() => void>());
@@ -117,7 +135,12 @@ export function LoaderRuntime({
     const loader = Component.loader;
     if (!loader) {
       redirectCountRef.current = 0;
-      setState({ phase: 'ready', error: null, readyComponent: Component });
+      setState({
+        phase: 'ready',
+        error: null,
+        readyComponent: Component,
+        readyPath: router.asPath,
+      });
       setPhase('ready');
       return;
     }
@@ -146,6 +169,7 @@ export function LoaderRuntime({
               phase: 'error',
               error: new Error('Too many redirects'),
               readyComponent: null,
+              readyPath: null,
             });
             setPhase('error');
             return;
@@ -162,7 +186,12 @@ export function LoaderRuntime({
         const message =
           error instanceof Error ? error.message : String(error);
         devtools?.completeNavigation(navId, 'error', message);
-        setState({ phase: 'error', error, readyComponent: null });
+        setState({
+          phase: 'error',
+          error,
+          readyComponent: null,
+          readyPath: null,
+        });
         setPhase('error');
         return;
       }
@@ -171,7 +200,12 @@ export function LoaderRuntime({
 
       redirectCountRef.current = 0;
       devtools?.completeNavigation(navId, 'ready');
-      setState({ phase: 'ready', error: null, readyComponent: Component });
+      setState({
+        phase: 'ready',
+        error: null,
+        readyComponent: Component,
+        readyPath: router.asPath,
+      });
       setPhase('ready');
     };
 
@@ -184,7 +218,10 @@ export function LoaderRuntime({
     };
   }, [Component, router.asPath, setPhase]);
 
-  const isReady = state.phase === 'ready' && state.readyComponent === Component;
+  const isReady =
+    state.phase === 'ready' &&
+    state.readyComponent === Component &&
+    state.readyPath === router.asPath;
 
   return (
     <LoaderPhaseContext.Provider value={store}>

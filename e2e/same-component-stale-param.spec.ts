@@ -22,7 +22,7 @@ const test = describeExample('basic-list-detail');
  * The nav is driven through Next's client router (window.next.router) — the same
  * path a <Link> click takes — so no example page needs a throwaway invalid link.
  */
-const fixed = false;
+const fixed = true;
 
 test.describe('same-component navigation to an invalid param', () => {
   test('does not crash the page before the loader redirects', async ({

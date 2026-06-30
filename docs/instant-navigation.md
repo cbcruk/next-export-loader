@@ -1,28 +1,31 @@
 # Instant navigation & the same-component loading gap
 
-This is a design note, not shipped behavior. It records a bug found while
-exploring "instant navigation" (in the sense of [Next.js 16.3][next163]), its
-root cause, and a proposed fix — so the change can be designed deliberately
-rather than bolted on.
+A design note recording a bug found while exploring "instant navigation" (in the
+sense of [Next.js 16.3][next163]), its root cause, the fix that shipped, and the
+part that deliberately did not.
 
 [next163]: https://nextjs.org/blog/next-16-3-instant-navigations
 
 ## TL;DR
 
 - On a **same-component navigation** that only changes the query param
-  (`/items?id=1` → `/items?id=999`), the page re-renders with the **new** param
-  *before* the loader settles.
-- For a valid id that's a cache hit, this shows up as a one-frame loading flash
+  (`/items?id=1` → `/items?id=999`), the page used to re-render with the **new**
+  param *before* the loader settled.
+- For a valid id that's a cache hit, this showed up as a one-frame loading flash
   (not truly "instant", despite invariant #4 holding).
-- For an **invalid** id, the component renders with bad data and **crashes**
-  into Next's error boundary *before* the loader's `RedirectError` can redirect
-  — so the loading phase is not guarding same-component navigations, and
-  invariant #3 is violated there.
-- Both symptoms share one root cause and one fix.
+- For an **invalid** id, the component rendered with bad data and **crashed**
+  into Next's error boundary *before* the loader's `RedirectError` could redirect
+  — the loading phase was not guarding same-component navigations, and invariant
+  #3 was violated there.
+- **Shipped:** readiness is now tracked per navigation (`readyPath`), so the
+  loader re-runs and the page waits for it before rendering the new param. The
+  crash and the invariant-#3 violation are fixed.
+- **Not shipped:** the cache-hit flash. Removing it needs a held-render
+  mechanism (Stream mode), out of scope here.
 
 Pinned by [`e2e/same-component-stale-param.spec.ts`](../e2e/same-component-stale-param.spec.ts)
-(crash) and [`e2e/instant-navigation.spec.ts`](../e2e/instant-navigation.spec.ts)
-(flash), each with a flag to flip green when fixed.
+(crash — now green) and [`e2e/instant-navigation.spec.ts`](../e2e/instant-navigation.spec.ts)
+(flash — still documents the remaining gap via `switchIsInstant`).
 
 ## Root cause
 
@@ -68,37 +71,40 @@ synchronously, before the new component renders). It does **not** for
 same-component navigations, which is exactly the case this note is about. The
 fix has to close that asymmetry.
 
-## Proposed behavior
+## The two parts (and why only one is done)
 
-The runtime should treat *any* navigation — same component or not — as "not
-ready until the loader settles", while choosing what to show in the meantime:
+These looked like one change from two angles. Implementing the first showed
+they're not — the second is strictly harder and is *not* shipped.
 
-1. **Hold the last-good render, or show the fallback, until the loader settles.**
-   The page must not re-render with the new param while the loader is still
-   deciding (data + redirect). Concretely, gate `children` on the navigation the
-   loader is currently resolving, not just on component identity. The page only
-   sees a param the loader has already validated.
+1. **Gate readiness per navigation (DONE).** The runtime tracks `readyPath` (the
+   `router.asPath` the loader resolved for) alongside `readyComponent`, and
+   treats *any* target change — different component OR same-component param
+   change — as "not ready until the loader settles". While loading it shows the
+   fallback, so the page never renders a param the loader hasn't validated. This
+   fixes the crash and the invariant-#3 violation.
 
-2. **Skip the loading phase when the loader resolves from cache without
-   redirecting.** If `ensureQueryData` is a cache hit and no `RedirectError` is
-   thrown, commit straight to the new render — no `loading` frame. This is the
-   "instant" win, and it falls out naturally once (1) holds the old render
-   instead of flashing the fallback.
-
-(1) fixes the crash and the invariant-#3 violation; (2) fixes the flash. They're
-the same change viewed from two angles: stop coupling "which component" to "is
-the new URL's data ready", and track readiness per navigation.
+2. **Skip the loading frame on a cache hit (NOT done).** Truly instant means no
+   loading frame at all when the loader resolves from cache without redirecting.
+   The naive hope was that (1) gives this for free — it does **not**. (1) shows
+   the *fallback* during the in-flight window; to show nothing instead, the
+   runtime would have to **hold the previous, already-valid render** until the
+   loader settles. But the page reads the new param directly via `useRouter()`,
+   so a held element reference still re-reads the new `?id` — freezing it needs
+   a `<Suspense>` boundary / held-render mechanism. That's the Stream-mode
+   territory below, and it trades away invariant #3. So same-component cache-hit
+   switches still flash one frame today; that's the remaining gap.
 
 ## Invariant impact
 
-| Invariant | Today (same-component) | After fix |
+| Invariant | Before | After part 1 (shipped) |
 | --- | --- | --- |
 | #1 loader awaited before mount | violated (page renders new param pre-settle) | upheld |
 | #2 latest navigation wins | upheld (navId) | upheld |
 | #3 redirect decided before render | **violated** (crash precedes redirect) | upheld |
-| #4 data is a cache hit | upheld (no refetch), but flashes | upheld, and now without a flash |
+| #4 data is a cache hit | upheld (no refetch), but flashes | upheld; **still flashes** (part 2) |
 
-The fix strengthens #1 and #3; it does not weaken #2 or #4.
+Part 1 strengthens #1 and #3 and weakens neither #2 nor #4. The flash under #4
+is not a correctness issue — it's the instant-navigation gap part 2 would close.
 
 ## Relationship to Next.js 16.3
 
@@ -107,10 +113,12 @@ The fix strengthens #1 and #3; it does not weaken #2 or #4.
 that don't port to `output: 'export'`. What ports is the *yardstick*: a
 navigation is "instant" when no loading frame of its own appears.
 
-- Today the library only offers **Block** (await before mount), and even that
-  leaks a frame on same-component navigations — the bug above.
-- The proposed fix makes same-component cache hits genuinely instant, i.e. a
-  correct Block with no spurious frame.
+- The library offers **Block** (await before mount). Part 1 made it a *correct*
+  Block — same-component navigations now wait for the loader instead of rendering
+  the new param early — but it still shows a fallback frame, so it is not yet
+  "instant" by the 16.3 yardstick.
+- Making same-component cache hits genuinely instant (no frame at all) is part 2,
+  and needs the held-render mechanism below.
 - A future **Stream** mode (mount immediately, let `useSuspenseQuery` suspend
   inside a `<Suspense>` boundary) is a larger, separate change. It trades away
   invariant #3 by construction (the component mounts before the loader can
@@ -120,10 +128,9 @@ navigation is "instant" when no loading frame of its own appears.
 ## Test hooks
 
 - [`e2e/same-component-stale-param.spec.ts`](../e2e/same-component-stale-param.spec.ts)
-  — asserts the current crash; flip `fixed` to assert the redirect-without-crash
-  behavior.
+  — `fixed = true`: asserts the navigation redirects without crashing (part 1).
 - [`e2e/instant-navigation.spec.ts`](../e2e/instant-navigation.spec.ts) — asserts
-  the cache-hit switch still flashes; flip `switchIsInstant` once the loading
-  phase is skipped on a cache-resolved, non-redirecting load.
+  the cache-hit switch still flashes; flip `switchIsInstant` once part 2 skips the
+  loading frame on a cache-resolved, non-redirecting load.
 - [`expectInstantNavigation`](../e2e/utils.ts) — the MutationObserver-based
   helper both specs use to catch even a single-frame fallback.
