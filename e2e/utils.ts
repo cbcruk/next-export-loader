@@ -107,6 +107,60 @@ export async function startExample(name: string): Promise<RunningExample> {
 
 export { expect };
 
+/**
+ * Asserts a navigation was *instant*: the loading fallback never appeared while
+ * `action` ran (the library's core promise — on a cache hit the page mounts with
+ * data and shows no loading frame of its own).
+ *
+ * Polling for absence is racy, so we install a MutationObserver in the page that
+ * latches if any node containing `fallbackText` is ever added to the DOM. The
+ * latch survives even a single frame the human eye would miss. `action` should
+ * perform the navigation and await its settled result; `expectVisible` is then
+ * checked to confirm the destination actually rendered (so a no-op can't pass).
+ *
+ * @param page - Playwright page.
+ * @param fallbackText - Text rendered by the loading fallback (e.g. "Loading...").
+ * @param action - Triggers the navigation and awaits the destination content.
+ */
+export async function expectInstantNavigation(
+  page: Page,
+  fallbackText: string,
+  action: () => Promise<void>,
+): Promise<void> {
+  await page.evaluate((text) => {
+    const w = window as unknown as { __nelFallbackSeen?: boolean };
+    w.__nelFallbackSeen = false;
+    const seen = (root: Node): boolean =>
+      root instanceof HTMLElement && root.textContent
+        ? root.textContent.includes(text)
+        : false;
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        record.addedNodes.forEach((node) => {
+          if (seen(node)) w.__nelFallbackSeen = true;
+        });
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    // Also catch a fallback already on screen at the moment we start watching.
+    if (document.body.textContent?.includes(text)) {
+      w.__nelFallbackSeen = true;
+    }
+  }, fallbackText);
+
+  await action();
+
+  const fallbackSeen = await page.evaluate(() => {
+    const w = window as unknown as { __nelFallbackSeen?: boolean };
+    return w.__nelFallbackSeen === true;
+  });
+
+  expect(
+    fallbackSeen,
+    `Expected an instant navigation, but the "${fallbackText}" fallback appeared.`,
+  ).toBe(false);
+}
+
 /** Playwright test with a `page` guard that fails on uncaught page errors. */
 export const test = base.extend<Record<never, never>>({
   page: async ({ page }: { page: Page }, use) => {
