@@ -212,6 +212,50 @@ future attempt starts from these facts rather than re-deriving them.
 If it's ever revisited, an opt-in `mode: 'stream'` scoped to controlled-location
 pages is the least-bad route — the API cost is contained to pages that opt in.
 
+### Sketch: `useLoaderQuery` (only if justified by more than the flash)
+
+Removing the flash alone does **not** justify a controlled location — it's a
+cosmetic one-frame issue, the library has no users yet, and "the flash bothers me"
+is a hypothesis (derived from Next 16.3), not reported demand. Building a
+page-facing API on that basis just adds unproven surface. So this is a sketch, not
+a plan.
+
+It becomes worth building only when framed as a **feature in its own right**, with
+the flash fix as a byproduct:
+
+- **Typed search params, extended to the component.** `defineLoader<TQuery>`
+  already types the query *inside the loader*; `useLoaderQuery<{ id: string }>()`
+  would extend that typed, runtime-owned query *to the page* — where today the page
+  falls back to untyped `router.query`.
+- **Router-controlled reads, à la TanStack Router.** TanStack's `Route.useSearch()`
+  is exactly a router-owned query; adopting the same shape keeps the
+  [migration path](./migrating-to-tanstack-router.md) conceptually aligned.
+- **Flash removal falls out.** Because the runtime owns the query the page reads, it
+  can withhold the new params until the loader validates them — so a same-component
+  cache-hit switch commits with no loading frame, and an invalid param never reaches
+  the page. Both part-2 goals, for free, *once the page reads `useLoaderQuery`
+  instead of `useRouter`*.
+
+Rough shape, opt-in per page:
+
+```tsx
+// Runtime provides the validated query via context; the page reads it instead of
+// useRouter(). The runtime updates the context only after the loader settles.
+ItemsPage.loaderMode = 'stream';
+export default function ItemsPage() {
+  const { id } = useLoaderQuery<{ id: string }>(); // runtime-owned, always valid
+  const { data: items } = useSuspenseQuery(itemsQuery());
+  const selected = items.find((i) => i.id === id)!; // safe: id is loader-validated
+  // ...
+}
+```
+
+Cost, stated honestly: it's a real page-facing API, it can't be *enforced* (a stray
+`useRouter()` in a stream page re-opens the crash — needs at least an ESLint rule,
+maybe a dev warning), and it partly duplicates `next/router`. Worth it for typed
+params + alignment; not worth it for the flash. Revisit when a user asks for either
+typed params or an instant same-component switch — not before.
+
 ### Not this: mount-before-loader Stream
 
 A true 16.3-style **Stream** mode (mount the page immediately, let
