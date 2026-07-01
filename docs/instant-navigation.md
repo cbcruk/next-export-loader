@@ -117,13 +117,87 @@ navigation is "instant" when no loading frame of its own appears.
   Block — same-component navigations now wait for the loader instead of rendering
   the new param early — but it still shows a fallback frame, so it is not yet
   "instant" by the 16.3 yardstick.
-- Making same-component cache hits genuinely instant (no frame at all) is part 2,
-  and needs the held-render mechanism below.
-- A future **Stream** mode (mount immediately, let `useSuspenseQuery` suspend
-  inside a `<Suspense>` boundary) is a larger, separate change. It trades away
-  invariant #3 by construction (the component mounts before the loader can
-  redirect), so it needs an opt-in and a 2-phase loader (redirect decision
-  blocking, data streaming). Out of scope for this note.
+- Making same-component cache hits genuinely instant (no frame at all) is part 2.
+  Probes show it's achievable by deferring the loading commit + holding the last
+  ready snapshot — no `<Suspense>` needed — but it collides with the crash fix and
+  needs the design worked out below.
+- A separate, larger **Stream** mode (mount immediately, `useSuspenseQuery`
+  suspends inside `<Suspense>`) would trade away invariant #3 by construction, so
+  it's the non-preferred track. See "Part 2 design" below.
+
+## Part 2 design: instant without the flash
+
+Part 2 was explored with throwaway runtime probes (not shipped). Three facts came
+out of them, and they define the whole problem.
+
+### What the probes measured
+
+Using `expectInstantNavigation`-style MutationObserver counting on a
+same-component cache-hit switch (`/items?id=1` → `?id=2`, valid ids):
+
+| Runtime variant | `Loading...` frames |
+| --- | --- |
+| shipped (part 1) | **1** — the flash |
+| optimistic hold: drop the synchronous reset, defer the `loading` commit to a microtask (skip it if the loader already settled), and relax the render gate to component-only | **0** — instant |
+| …same optimistic hold, but navigating to an **invalid** id | crash returns |
+
+So two things are now known for certain:
+
+1. **Instant is achievable without Suspense.** Because a cache hit resolves the
+   loader within a microtask, deferring the `loading` commit means React never
+   commits a loading frame — the page swaps straight from the old render to the
+   new one. (This corrects the earlier assumption that part 2 needed a
+   `<Suspense>`/held-render mechanism.)
+2. **Instant and the crash fix are in direct tension.** Both are answers to "what
+   do we show while the loader re-runs on a same-component nav?" — and they want
+   opposite things:
+   - crash fix → show the **fallback** (safe: the page never renders an
+     unvalidated param);
+   - instant → let the page **render the new param immediately** (fast, but an
+     invalid param crashes because the component reads `router.query` directly,
+     before the loader validates it).
+
+### Why it's fundamental
+
+The page reads `router.query` **directly** (`const id = router.query.id`). The
+runtime cannot let React render the page with a param the loader hasn't validated,
+yet it also cannot show a fallback without a frame. The only way to have both is to
+**keep showing the last validated render until the loader settles the new one** —
+not the *live* component (it would re-read the new `router.query` and crash), but a
+frozen snapshot of the previous ready output.
+
+### Candidate: hold the last-ready snapshot
+
+Keep the render gate at `readyPath === router.asPath` (preserving the crash fix),
+but when the gate is false, render a **frozen snapshot of the last ready children**
+instead of the fallback — then swap to the live children the instant the loader
+commits the new `readyPath`. On a cache hit that swap is within a microtask, so the
+user sees no flash; on a cache miss the snapshot holds until data arrives (or the
+fallback takes over after a threshold, TBD).
+
+Open questions this raises (why it needs design, not just code):
+
+- **Freezing a React subtree.** The snapshot must not re-read `router.query`.
+  Options: capture the previous `children` element and render it inside a provider
+  that pins the old query; or have `LoaderRuntime` own an off-router "displayed
+  location" that the page reads instead of `useRouter` directly (larger API change).
+- **Stale-data window.** Holding the old snapshot means the user briefly sees the
+  *previous* item's content after clicking — acceptable for a fast cache hit,
+  questionable for a slow miss. Needs a max-hold threshold before falling back.
+- **Opt-in surface.** Whether this is always-on (correct Block, no flash) or an
+  explicit `mode: 'stream'` per route. The probe suggests always-on is viable for
+  cache hits; misses are where an opt-in might matter.
+- **Interaction with `useLoaderPhase`.** During the hold the phase is "loading"
+  but the screen shows content — the progress bar semantics need a decision.
+
+### Not this: mount-before-loader Stream
+
+A true 16.3-style **Stream** mode (mount the page immediately, let
+`useSuspenseQuery` suspend inside a `<Suspense>` boundary) is a different, larger
+change. It trades away invariant #3 by construction — the component mounts before
+the loader can redirect — so it needs an explicit opt-in and a 2-phase loader
+(redirect decision blocking, data streaming). The snapshot-hold approach above is
+preferred because it keeps #3 intact; Stream stays a separate future track.
 
 ## Test hooks
 
