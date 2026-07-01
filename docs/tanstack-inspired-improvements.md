@@ -86,8 +86,19 @@ would need.
 
 TanStack's `<Link preload="intent">` runs the destination route's **actual
 loader** on intent. Our `PrefetchLink` takes a **manual** `prefetch={[itemsQuery()]}`
-list ([prefetch-link.tsx](../packages/next-export-loader/src/prefetch-link.tsx#L46))
+list ([prefetch-link.tsx](../packages/next-export-loader/src/prefetch-link.tsx))
 that can drift from the target page's real loader. Independent, small; phase 5.
+
+Shipped as an optional `loader` prop on `PrefetchLink` (`runLoaderForPrefetch`
+under the hood): on intent it runs the destination's loader body — applying
+`validate` first, but **not** `beforeLoad` (the guard/redirect phase), and
+swallowing any throw — so it warms exactly the queries the page needs, with no
+list to keep in sync. The honest cost, unlike TanStack's router-owned lazy
+loaders, is that referencing the loader eagerly imports it (no lazy chunk split),
+so `prefetch` (the decoupled list) stays for cross-page links where that coupling
+isn't wanted. basic-list-detail uses `loader` for its same-page param links (no
+extra import cost). `PrefetchLink` is now generic over the query shape so a typed
+loader can be passed without widening.
 
 ## Phased plan
 
@@ -100,7 +111,7 @@ public API. Invariants are never weakened without an explicit opt-in.
 | 2 | `useLoaderQuery()` — runtime-owned validated query, read by the page | none (non-stream: same gating as today) | **done** |
 | 3 | Instant same-component switch on cache hit (opt-in `loaderMode: 'instant'` on `useLoaderQuery` pages) | closes the part-2 flash; keeps #3 because the page reads validated query, not `router.query` | **done** |
 | 4 | `beforeLoad` redirect-phase split | makes #3 structural | **done** |
-| 5 | `PrefetchLink` accepts the target loader (drift fix) | none | deferred |
+| 5 | `PrefetchLink` accepts the target loader (drift fix) | none | **done** |
 
 ### Phase 1 — `validate` in `defineLoader` (this note's first build)
 

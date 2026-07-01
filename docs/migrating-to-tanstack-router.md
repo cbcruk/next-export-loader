@@ -20,6 +20,7 @@ If you still need `next/image`, `next/head`, or other Next.js-specific features,
 | `queryClient.ensureQueryData()` | `queryClient.ensureQueryData()` | Identical — TanStack Router integrates with TanStack Query the same way |
 | `useSuspenseQuery(opts)` | `useSuspenseQuery(opts)` | Unchanged |
 | `<PrefetchLink>` | `<Link preload="intent">` | Built-in, no wrapper needed |
+| `<PrefetchLink loader={...}>` | `<Link preload="intent">` | 둘 다 목적지 loader를 intent에 실행 — TanStack은 라우터가 lazy 소유, 이 라이브러리는 loader를 직접 넘김(eager import) |
 | `useLoaderPhase()` | `router.state.status` | `'idle' | 'pending'` |
 | `defineLoader({ validate })` | `validateSearch` | 둘 다 raw query → typed/coerced shape |
 | `defineLoader({ beforeLoad })` | `beforeLoad` | 데이터 페칭 전 redirect·가드 phase (return void, cache로 공유) |

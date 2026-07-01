@@ -5,6 +5,9 @@ import {
   type FetchQueryOptions,
   type QueryClient,
 } from '@tanstack/react-query';
+import { parseUrl } from './internal/parse-url';
+import type { ParsedUrlQuery } from 'querystring';
+import type { LoaderFn } from './types';
 
 type NextLinkProps = React.ComponentProps<typeof Link>;
 
@@ -34,16 +37,62 @@ export function prefetchQueries(
 }
 
 /**
- * Props for {@link PrefetchLink}: all `next/link` props except `prefetch`,
- * which is replaced with a list of queries to warm.
+ * Warms the destination's data by running its loader on intent, best-effort.
+ *
+ * Runs only the loader body (applying its `validate` first) — not `beforeLoad`,
+ * which is the guard/redirect phase — and swallows any throw, including a
+ * {@link RedirectError}: a prefetch must never navigate or surface an error, it
+ * only fills the cache. `ensureQueryData` inside the loader respects `staleTime`,
+ * so a warm cache is a no-op. Fire-and-forget.
+ *
+ * This is the zero-drift alternative to a manual `prefetch` list: the loader is
+ * the single source of what the page needs, so the two can never disagree. The
+ * cost is that referencing the loader eagerly imports it (no lazy chunk split for
+ * that code), so prefer it for same-page param links or when the coupling is
+ * acceptable; use `prefetch` when you want to stay decoupled.
  */
-export interface PrefetchLinkProps
+export function runLoaderForPrefetch<TQuery = ParsedUrlQuery>(
+  queryClient: QueryClient,
+  loader: LoaderFn<TQuery>,
+  href: string,
+): void {
+  const raw = parseUrl(href);
+  // Without a validator, the raw query stands in for TQuery — the same
+  // (intentional) gap the runtime has when a loader declares no `validate`.
+  const query = (loader.validate ? loader.validate(raw) : raw) as TQuery;
+  void (async () => {
+    try {
+      await loader({
+        query,
+        queryClient,
+        signal: new AbortController().signal,
+      });
+    } catch {
+      // Best-effort: redirects/errors are irrelevant to warming the cache.
+    }
+  })();
+}
+
+/**
+ * Props for {@link PrefetchLink}: all `next/link` props except `prefetch`, which
+ * is replaced with what to warm on intent. Provide `prefetch` (a query list),
+ * `loader` (the destination's loader), or both.
+ */
+export interface PrefetchLinkProps<TQuery = ParsedUrlQuery>
   extends Omit<NextLinkProps, 'prefetch'> {
   /**
    * Queries to prefetch on hover/focus, so the destination's loader resolves
-   * from cache. Pass the same `queryOptions()` objects the loader uses.
+   * from cache. Pass the same `queryOptions()` objects the loader uses. Simple
+   * and decoupled, but can drift from the loader's actual query set — see
+   * `loader` for the zero-drift alternative.
    */
   prefetch?: ReadonlyArray<PrefetchableQuery>;
+  /**
+   * The destination page's loader, run on hover/focus so it warms exactly what
+   * the page needs (single source of truth, no drift). Only runs when `href` is
+   * a string. See {@link runLoaderForPrefetch} for the trade-off.
+   */
+  loader?: LoaderFn<TQuery>;
 }
 
 /**
@@ -55,26 +104,34 @@ export interface PrefetchLinkProps
  *
  * @example
  * ```tsx
- * <PrefetchLink href="/items" prefetch={[itemsQuery()]}>
- *   Items
- * </PrefetchLink>
+ * // Decoupled: an explicit query list.
+ * <PrefetchLink href="/items" prefetch={[itemsQuery()]}>Items</PrefetchLink>
+ *
+ * // Zero-drift: run the destination's loader.
+ * <PrefetchLink href="/items?id=2" loader={itemsLoader}>Item 2</PrefetchLink>
  * ```
  */
-export function PrefetchLink({
+export function PrefetchLink<TQuery = ParsedUrlQuery>({
   prefetch,
+  loader,
+  href,
   onMouseEnter,
   onFocus,
   ...linkProps
-}: PrefetchLinkProps): ReactNode {
+}: PrefetchLinkProps<TQuery>): ReactNode {
   const queryClient = useQueryClient();
 
   const handlePrefetch = useCallback(() => {
     prefetchQueries(queryClient, prefetch);
-  }, [prefetch, queryClient]);
+    if (loader && typeof href === 'string') {
+      runLoaderForPrefetch(queryClient, loader, href);
+    }
+  }, [prefetch, loader, href, queryClient]);
 
   return (
     <Link
       {...linkProps}
+      href={href}
       onMouseEnter={(e) => {
         handlePrefetch();
         if (typeof onMouseEnter === 'function') onMouseEnter(e);

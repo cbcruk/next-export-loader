@@ -12,6 +12,22 @@ interface ItemsQuery {
   id?: string;
 }
 
+const itemsLoader = defineLoader<ItemsQuery>({
+  validate: (raw) => ({
+    id: typeof raw.id === 'string' ? raw.id : undefined,
+  }),
+  load: async ({ query, queryClient }) => {
+    const items = await queryClient.ensureQueryData(itemsQuery());
+
+    if (!query.id && items.length > 0) {
+      throw new RedirectError(`/items?id=${items[0]!.id}`);
+    }
+    if (query.id && !items.some((i) => i.id === query.id)) {
+      throw new RedirectError(`/items?id=${items[0]!.id}`);
+    }
+  },
+});
+
 export default function ItemsPage(): ReactElement {
   const { data: items } = useSuspenseQuery(itemsQuery());
   const { id: selectedId } = useLoaderQuery<ItemsQuery>();
@@ -26,7 +42,7 @@ export default function ItemsPage(): ReactElement {
             <li key={item.id} style={{ marginBottom: 8 }}>
               <PrefetchLink
                 href={`/items?id=${item.id}`}
-                prefetch={[itemsQuery()]}
+                loader={itemsLoader}
                 style={{
                   fontWeight: item.id === selectedId ? 'bold' : 'normal',
                   cursor: 'pointer',
@@ -47,18 +63,4 @@ export default function ItemsPage(): ReactElement {
 }
 
 ItemsPage.loaderMode = 'instant';
-ItemsPage.loader = defineLoader<ItemsQuery>({
-  validate: (raw) => ({
-    id: typeof raw.id === 'string' ? raw.id : undefined,
-  }),
-  load: async ({ query, queryClient }) => {
-    const items = await queryClient.ensureQueryData(itemsQuery());
-
-    if (!query.id && items.length > 0) {
-      throw new RedirectError(`/items?id=${items[0]!.id}`);
-    }
-    if (query.id && !items.some((i) => i.id === query.id)) {
-      throw new RedirectError(`/items?id=${items[0]!.id}`);
-    }
-  },
-});
+ItemsPage.loader = itemsLoader;
