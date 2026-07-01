@@ -92,6 +92,17 @@ describe('defineLoader object form (validate)', () => {
     assert.deepStrictEqual(loader.validate({ page: '5' }), { page: 5 });
     assert.deepStrictEqual(loader.validate({}), { page: 1 });
   });
+
+  it('attaches beforeLoad from the definition object', () => {
+    const beforeLoad = (): void => {};
+    const loader = defineLoader({ beforeLoad, load: async () => {} });
+    assert.strictEqual(loader.beforeLoad, beforeLoad);
+  });
+
+  it('leaves beforeLoad undefined when the object omits it', () => {
+    const loader = defineLoader({ load: async () => {} });
+    assert.strictEqual(loader.beforeLoad, undefined);
+  });
 });
 
 describe('loader query cache invariant', () => {

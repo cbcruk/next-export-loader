@@ -36,9 +36,13 @@ export default function DashboardPage(): ReactElement {
   );
 }
 
-DashboardPage.loader = defineLoader(async ({ queryClient }) => {
-  if (!isAuthenticated()) {
-    throw new RedirectError('/login');
-  }
-  await queryClient.ensureQueryData(profileQuery());
+DashboardPage.loader = defineLoader({
+  beforeLoad: () => {
+    if (!isAuthenticated()) {
+      throw new RedirectError('/login');
+    }
+  },
+  load: async ({ queryClient }) => {
+    await queryClient.ensureQueryData(profileQuery());
+  },
 });

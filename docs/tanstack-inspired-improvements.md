@@ -71,7 +71,16 @@ TanStack splits guard/redirect decisions (`beforeLoad`) from data fetching
 Splitting them makes invariant #3 (redirect decided before mount) **structural
 rather than conventional**, and it is the prerequisite the parked Stream mode
 already named ("2-phase loader: redirect decision blocking, data streaming" —
-instant-navigation.md). Deferred to phase 4; revisit alongside any Stream work.
+instant-navigation.md).
+
+Shipped in phase 4 as an optional `beforeLoad` in `defineLoader`'s object form:
+the runtime runs `validate → beforeLoad → load`, all before mount, in one
+try/redirect scope. `beforeLoad` returns void (share data via the query cache,
+not a return value), keeping the types simple. auth-gated's dashboard is the
+worked example — the auth guard moved out of the data loader into `beforeLoad`,
+so an unauthorized navigation redirects without ever triggering the fetch. This
+also positions `beforeLoad` as the blocking redirect phase a future Stream mode
+would need.
 
 ### C. `<PrefetchLink>` should run the loader, not a hand-listed query set
 
@@ -90,7 +99,7 @@ public API. Invariants are never weakened without an explicit opt-in.
 | 1 | `defineLoader({ validate, load })` — validated/typed/coerced `ctx.query` | strengthens #3 (coerce as redirect alternative); none weakened | **done** |
 | 2 | `useLoaderQuery()` — runtime-owned validated query, read by the page | none (non-stream: same gating as today) | **done** |
 | 3 | Instant same-component switch on cache hit (opt-in `loaderMode: 'instant'` on `useLoaderQuery` pages) | closes the part-2 flash; keeps #3 because the page reads validated query, not `router.query` | **done** |
-| 4 | `beforeLoad` redirect-phase split | makes #3 structural | deferred |
+| 4 | `beforeLoad` redirect-phase split | makes #3 structural | **done** |
 | 5 | `PrefetchLink` accepts the target loader (drift fix) | none | deferred |
 
 ### Phase 1 — `validate` in `defineLoader` (this note's first build)

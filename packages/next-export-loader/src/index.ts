@@ -8,6 +8,7 @@ export { useLoaderPhase } from './use-loader-phase';
 export { useLoaderQuery } from './use-loader-query';
 
 export type {
+  BeforeLoadFn,
   LoaderContext,
   LoaderFn,
   LoaderMode,

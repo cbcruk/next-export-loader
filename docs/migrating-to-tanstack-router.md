@@ -22,6 +22,7 @@ If you still need `next/image`, `next/head`, or other Next.js-specific features,
 | `<PrefetchLink>` | `<Link preload="intent">` | Built-in, no wrapper needed |
 | `useLoaderPhase()` | `router.state.status` | `'idle' | 'pending'` |
 | `defineLoader({ validate })` | `validateSearch` | 둘 다 raw query → typed/coerced shape |
+| `defineLoader({ beforeLoad })` | `beforeLoad` | 데이터 페칭 전 redirect·가드 phase (return void, cache로 공유) |
 | `useLoaderQuery<T>()` | `Route.useSearch()` | runtime-owned typed query; `T`는 이 라이브러리에선 수동 명시 |
 | `Page.loaderMode = 'instant'` | `defaultPendingMs` (pending 지연) | 둘 다 cache hit이 pending/fallback을 깜빡이지 않게 함 — TanStack은 pending 컴포넌트 표시를 지연, 이 라이브러리는 loading commit을 defer |
 | `<LoaderRuntime>` | `<RouterProvider>` | The router itself manages the lifecycle |

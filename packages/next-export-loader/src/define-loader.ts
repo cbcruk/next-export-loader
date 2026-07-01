@@ -1,15 +1,18 @@
 import type { ParsedUrlQuery } from 'querystring';
-import type { LoaderFn, ValidateQuery } from './types';
+import type { BeforeLoadFn, LoaderFn, ValidateQuery } from './types';
 
 /**
- * Object form of a loader: a data-fetching {@link LoaderFn} plus a
- * {@link ValidateQuery} that shapes the raw URL query before it runs.
+ * Object form of a loader: a data-fetching {@link LoaderFn} plus optional
+ * lifecycle hooks the runtime runs first — a {@link ValidateQuery} that shapes
+ * the raw URL query, and a {@link BeforeLoadFn} guard/redirect phase.
  *
- * @typeParam TQuery - Validated query shape shared by `validate` and `load`.
+ * @typeParam TQuery - Validated query shape shared by the hooks and `load`.
  */
 export interface LoaderDefinition<TQuery = ParsedUrlQuery> {
-  /** Validates/coerces the raw query into `TQuery` before `load` runs. */
+  /** Validates/coerces the raw query into `TQuery` before anything else runs. */
   validate?: ValidateQuery<TQuery>;
+  /** Guard/redirect phase, run after `validate` and before `load`. */
+  beforeLoad?: BeforeLoadFn<TQuery>;
   /** The loader; receives the validated `TQuery` as `ctx.query`. */
   load: LoaderFn<TQuery>;
 }
@@ -24,12 +27,13 @@ export interface LoaderDefinition<TQuery = ParsedUrlQuery> {
  * Two forms:
  * - A bare async function — returned unchanged; `ctx.query` is the raw
  *   {@link ParsedUrlQuery}.
- * - An object `{ validate, load }` — the runtime runs `validate` against the raw
- *   query first, so `ctx.query` in `load` is the typed, validated shape (numbers,
- *   enums, coerced defaults), mirroring TanStack Router's `validateSearch`.
+ * - An object `{ validate, beforeLoad, load }` — the runtime runs `validate`
+ *   (shapes the query, mirroring TanStack Router's `validateSearch`), then
+ *   `beforeLoad` (the guard/redirect phase, à la TanStack's `beforeLoad`), then
+ *   `load`. All run before the component mounts.
  *
  * @typeParam TQuery - Shape of the query, inferred from the argument.
- * @param loaderOrDefinition - A loader function, or a `{ validate, load }` object.
+ * @param loaderOrDefinition - A loader function, or a definition object.
  * @returns A loader typed for attachment to a page component.
  *
  * @example
@@ -39,11 +43,14 @@ export interface LoaderDefinition<TQuery = ParsedUrlQuery> {
  *   await queryClient.ensureQueryData(itemsQuery());
  * });
  *
- * // Object form — validated query.
+ * // Object form — validate, guard, then load.
  * Page.loader = defineLoader({
  *   validate: (raw) => ({ page: Number(raw.page ?? 1) }),
- *   load: async ({ query }) => {
- *     query.page; // number, validated
+ *   beforeLoad: () => {
+ *     if (!isAuthenticated()) throw new RedirectError('/login');
+ *   },
+ *   load: async ({ query, queryClient }) => {
+ *     await queryClient.ensureQueryData(itemsQuery(query.page));
  *   },
  * });
  * ```
@@ -60,8 +67,9 @@ export function defineLoader<TQuery = ParsedUrlQuery>(
   if (typeof loaderOrDefinition === 'function') {
     return loaderOrDefinition;
   }
-  const { validate, load } = loaderOrDefinition;
+  const { validate, beforeLoad, load } = loaderOrDefinition;
   const loader: LoaderFn<TQuery> = (ctx) => load(ctx);
   loader.validate = validate;
+  loader.beforeLoad = beforeLoad;
   return loader;
 }

@@ -84,19 +84,23 @@ export const loader = defineLoader(async ({ query, queryClient, signal }) => {
 });
 ```
 
-**Object form (`validate`).** raw query를 loader 실행 전에 검증/coerce하고 싶으면 `{ validate, load }` 형태를 쓴다. `<LoaderRuntime>`이 `validate(raw)`를 먼저 실행하므로 `ctx.query`는 검증된 shape (숫자·enum 등)이 된다. TanStack Router의 `validateSearch`에 대응. invalid param을 던지지 않고 유효 default로 coerce하면 redirect-on-invalid의 가벼운 대안이 된다.
+**Object form (`{ validate, beforeLoad, load }`).** raw query를 loader 실행 전에 검증하거나(→ `validate`), redirect·가드를 데이터 페칭과 분리하고 싶으면(→ `beforeLoad`) object form을 쓴다. runtime은 mount 전에 **`validate` → `beforeLoad` → `load`** 순으로 실행한다.
+
+- `validate(raw)` — `ctx.query`를 검증된 shape(숫자·enum 등)로 만든다. TanStack Router의 `validateSearch`에 대응. invalid param을 던지지 않고 유효 default로 coerce하면 redirect-on-invalid의 가벼운 대안이 된다.
+- `beforeLoad(ctx)` — redirect·access 가드 phase. **데이터 페칭 전에** 실행되므로, 권한 없는 navigation은 loader를 트리거하지 않고 곧장 redirect된다. TanStack Router의 `beforeLoad`에 대응. loader와 데이터 공유는 return 값이 아니라 query cache로 한다. 이로써 invariant #3(redirect는 mount 전 결정)이 컨벤션이 아닌 **구조**로 표현된다.
 
 ```ts
 export const loader = defineLoader<{ page: number }>({
   validate: (raw) => ({ page: Number(raw.page ?? 1) }), // invalid → 1, 크래시 없음
+  beforeLoad: () => {
+    if (!isAuthenticated()) throw new RedirectError('/login'); // 페치 전에 가드
+  },
   load: async ({ query, queryClient }) => {
-    query.page; // number, 검증됨 — `raw.page as string` 캐스팅 불필요
+    query.page; // number, 검증됨
     await queryClient.ensureQueryData(itemsQuery(query.page));
   },
 });
 ```
-
-검증된 query를 **컴포넌트**로 노출하는 `useLoaderQuery()`는 후속 phase 예정. 설계는 [docs/tanstack-inspired-improvements.md](docs/tanstack-inspired-improvements.md) 참고.
 
 ### `RedirectError`
 

@@ -206,11 +206,15 @@ export function LoaderRuntime({
       try {
         const raw = parseUrl(router.asPath);
         query = loader.validate ? loader.validate(raw) : raw;
-        await loader({
+        const ctx = {
           query,
           queryClient: queryClientRef.current,
           signal: abortController.signal,
-        });
+        };
+        // Guard/redirect phase first, before any data fetching: an unauthorized
+        // navigation redirects without ever triggering the loader.
+        if (loader.beforeLoad) await loader.beforeLoad(ctx);
+        await loader(ctx);
       } catch (error: unknown) {
         if (!isLatestNavigation(navId) || cancelled) return;
         settled = true;
