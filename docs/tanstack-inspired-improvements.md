@@ -89,7 +89,7 @@ public API. Invariants are never weakened without an explicit opt-in.
 |---|---|---|---|
 | 1 | `defineLoader({ validate, load })` — validated/typed/coerced `ctx.query` | strengthens #3 (coerce as redirect alternative); none weakened | **done** |
 | 2 | `useLoaderQuery()` — runtime-owned validated query, read by the page | none (non-stream: same gating as today) | **done** |
-| 3 | Instant same-component switch on cache hit (opt-in stream on controlled-location pages) | closes the part-2 flash; keeps #3 because the page reads validated query, not `router.query` | planned |
+| 3 | Instant same-component switch on cache hit (opt-in `loaderMode: 'instant'` on `useLoaderQuery` pages) | closes the part-2 flash; keeps #3 because the page reads validated query, not `router.query` | **done** |
 | 4 | `beforeLoad` redirect-phase split | makes #3 structural | deferred |
 | 5 | `PrefetchLink` accepts the target loader (drift fix) | none | deferred |
 
@@ -126,6 +126,33 @@ Design:
 Phase 1 does **not** yet expose the validated query to the component — that is
 phase 2 (`useLoaderQuery`). Phase 1's value on its own: typed, validated,
 coerced query *inside the loader*, replacing hand-casts.
+
+### Phase 2 — `useLoaderQuery()` (shipped)
+
+The runtime owns the validated query (`readyQuery`) and exposes it via context;
+the page reads `useLoaderQuery<T>()` instead of `useRouter().query`. Because the
+page only mounts once the loader is `ready`, the value is always the one the
+loader validated for the current URL. Non-stream: same render gating as before, so
+no behavior change beyond the typed read. This is the precondition Phase 3 needed.
+
+### Phase 3 — `loaderMode: 'instant'` (shipped)
+
+Opt-in per page (`ItemsPage.loaderMode = 'instant'`). On a same-component param
+change, the runtime **holds the last validated render** instead of resetting to
+the fallback: it skips the synchronous loading reset, relaxes the render gate to
+component-identity, and defers the loading commit by a macrotask — skipping it
+entirely if the loader settles first (a cache hit resolves within microtasks). The
+page keeps showing the previous `useLoaderQuery` value until the loader commits the
+new one, so:
+
+- a cache-hit switch commits with **no loading frame** (instant), and
+- an **invalid** param never reaches the page — the loader redirects first, while
+  the page still shows the last validated render (invariant #3 upheld).
+
+Safe only because the page reads the runtime-owned query, not `router.query`; a
+stray `useRouter().query` in an `instant` page re-opens the crash. That constraint
+is why it is opt-in and documented on the `LoaderMode` type. A genuinely slow load
+still falls back once the deferred macrotask fires.
 
 ## Why this order
 

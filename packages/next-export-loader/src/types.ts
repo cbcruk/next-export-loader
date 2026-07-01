@@ -13,6 +13,25 @@ import type { ParsedUrlQuery } from 'querystring';
 export type LoaderPhase = 'loading' | 'ready' | 'error';
 
 /**
+ * How `<LoaderRuntime>` renders a page while its loader re-runs on a
+ * same-component param change (e.g. `/items?id=1` → `?id=2`).
+ *
+ * - `block` (default) — show the `fallback` until the loader settles for the new
+ *   param. Safe for any page; a same-component cache-hit switch flashes the
+ *   fallback for one commit.
+ * - `instant` — keep showing the last validated render (the page reading the
+ *   previous {@link useLoaderQuery} value) until the loader settles, so a
+ *   cache-hit switch commits with no loading frame. **Only for pages that read
+ *   their params via {@link useLoaderQuery}, never `useRouter().query`** — the
+ *   runtime withholds the new param until the loader validates it, which it can
+ *   only do for its own owned query. A stray `useRouter().query` read in an
+ *   `instant` page re-opens the invalid-param crash.
+ *
+ * Set it on the page component: `ItemsPage.loaderMode = 'instant'`.
+ */
+export type LoaderMode = 'block' | 'instant';
+
+/**
  * Validates and shapes the raw URL query for a route.
  *
  * The input is always the raw {@link ParsedUrlQuery} (string values). The output

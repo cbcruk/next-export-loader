@@ -87,6 +87,9 @@ export function LoaderRuntime({
   const queryClientRef = useRef(queryClient);
   queryClientRef.current = queryClient;
   const redirectCountRef = useRef(0);
+  const readyComponentRef = useRef<
+    (React.ComponentType & PageWithLoader) | null
+  >(null);
 
   const [state, setState] = useState<LoaderState>({
     phase: 'loading',
@@ -96,13 +99,27 @@ export function LoaderRuntime({
     readyQuery: {},
   });
 
+  // In `instant` mode, hold the last validated render across a same-component
+  // param change instead of flashing the fallback: the page reads its param via
+  // useLoaderQuery (the held `readyQuery`), so it keeps showing the previous,
+  // already-validated view until the loader settles the new one — no loading
+  // frame, and an invalid param never reaches the page (the loader redirects
+  // first). Cross-component changes still reset; a different page can't be held.
+  const isSameComponentParamChange =
+    state.readyComponent === Component && state.readyPath !== router.asPath;
+  const holdForInstant =
+    Component.loaderMode === 'instant' &&
+    state.phase === 'ready' &&
+    isSameComponentParamChange;
+
   // Synchronously fall back to loading when the navigation target changes —
   // either a different component OR a same-component param change. Doing this
   // during render (not in the effect) keeps the page from rendering the new
   // param for even one commit before the loader has validated it.
   if (
     state.readyComponent !== null &&
-    (state.readyComponent !== Component || state.readyPath !== router.asPath)
+    (state.readyComponent !== Component || state.readyPath !== router.asPath) &&
+    !holdForInstant
   ) {
     setState({
       phase: 'loading',
@@ -146,6 +163,7 @@ export function LoaderRuntime({
     const loader = Component.loader;
     if (!loader) {
       redirectCountRef.current = 0;
+      readyComponentRef.current = Component;
       setState({
         phase: 'ready',
         error: null,
@@ -157,9 +175,31 @@ export function LoaderRuntime({
       return;
     }
 
+    let settled = false;
+    const commitLoading = (): void => {
+      setState((prev) => ({ ...prev, phase: 'loading', error: null }));
+      setPhase('loading');
+    };
+
     devtools?.startNavigation(navId, router.asPath, componentName);
-    setState((prev) => ({ ...prev, phase: 'loading', error: null }));
-    setPhase('loading');
+
+    // `instant` same-component switch: defer the loading commit by a macrotask
+    // and skip it if the loader settled first. A cache hit resolves within
+    // microtasks — before the macrotask — so no loading frame is committed; a
+    // genuinely slow load still falls back once the macrotask fires. Any other
+    // navigation commits loading immediately (the standard block behavior).
+    let loadingTimer: ReturnType<typeof setTimeout> | undefined;
+    const isInstantHold =
+      Component.loaderMode === 'instant' &&
+      readyComponentRef.current === Component;
+    if (isInstantHold) {
+      loadingTimer = setTimeout(() => {
+        if (cancelled || settled || !isLatestNavigation(navId)) return;
+        commitLoading();
+      }, 0);
+    } else {
+      commitLoading();
+    }
 
     const run = async (): Promise<void> => {
       let query: ParsedUrlQuery = {};
@@ -173,6 +213,7 @@ export function LoaderRuntime({
         });
       } catch (error: unknown) {
         if (!isLatestNavigation(navId) || cancelled) return;
+        settled = true;
 
         if (isRedirectError(error)) {
           redirectCountRef.current += 1;
@@ -213,8 +254,10 @@ export function LoaderRuntime({
       }
 
       if (!isLatestNavigation(navId) || cancelled) return;
+      settled = true;
 
       redirectCountRef.current = 0;
+      readyComponentRef.current = Component;
       devtools?.completeNavigation(navId, 'ready');
       setState({
         phase: 'ready',
@@ -230,6 +273,7 @@ export function LoaderRuntime({
 
     return () => {
       cancelled = true;
+      if (loadingTimer !== undefined) clearTimeout(loadingTimer);
       abortController.abort();
       devtools?.cancelNavigation(navId);
     };
@@ -238,7 +282,7 @@ export function LoaderRuntime({
   const isReady =
     state.phase === 'ready' &&
     state.readyComponent === Component &&
-    state.readyPath === router.asPath;
+    (state.readyPath === router.asPath || holdForInstant);
 
   return (
     <LoaderPhaseContext.Provider value={store}>

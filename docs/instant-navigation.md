@@ -2,9 +2,18 @@
 
 A design note recording a bug found while exploring "instant navigation" (in the
 sense of [Next.js 16.3][next163]), its root cause, the fix that shipped, and the
-part that deliberately did not.
+part that was parked — then later shipped.
 
 [next163]: https://nextjs.org/blog/next-16-3-instant-navigations
+
+> **Update (part 2 shipped).** The cache-hit flash is now closed via the exact
+> "least-bad route" this note predicted: an opt-in `loaderMode: 'instant'` scoped
+> to pages that read their params through `useLoaderQuery` instead of
+> `useRouter()`. Landed alongside the `defineLoader({ validate })` + `useLoaderQuery`
+> work — see [tanstack-inspired-improvements.md](./tanstack-inspired-improvements.md).
+> The analysis below is preserved as the reasoning that led there; the "parked"
+> framing is historical. `instant-navigation.spec.ts` now asserts the switch is
+> instant (0 loading frames).
 
 ## TL;DR
 
@@ -20,9 +29,12 @@ part that deliberately did not.
 - **Shipped:** readiness is now tracked per navigation (`readyPath`), so the
   loader re-runs and the page waits for it before rendering the new param. The
   crash and the invariant-#3 violation are fixed.
-- **Parked:** removing the cache-hit flash (part 2). Probes proved it's
-  achievable without Suspense, but every viable freeze mechanism costs more than a
-  1-frame flash is worth in the current architecture. See "Part 2 design" below.
+- **Shipped later (part 2):** removing the cache-hit flash. The blocker below was
+  "the page reads `router.query` directly, so the runtime can't withhold an
+  unvalidated param". `useLoaderQuery` dissolved it — the page now reads a
+  runtime-owned validated query, so `loaderMode: 'instant'` can hold the last
+  render until the loader settles. Opt-in, per page. See "Part 2 design" below and
+  the resolution box at the top.
 
 Pinned by [`e2e/same-component-stale-param.spec.ts`](../e2e/same-component-stale-param.spec.ts)
 (crash — now green) and [`e2e/instant-navigation.spec.ts`](../e2e/instant-navigation.spec.ts)
@@ -105,7 +117,8 @@ they're not — the second is strictly harder and is *not* shipped.
 | #4 data is a cache hit | upheld (no refetch), but flashes | upheld; **still flashes** (part 2) |
 
 Part 1 strengthens #1 and #3 and weakens neither #2 nor #4. The flash under #4
-is not a correctness issue — it's the instant-navigation gap part 2 would close.
+is not a correctness issue — it's the instant-navigation gap part 2 has since
+closed for pages on `loaderMode: 'instant'` (see the resolution box at the top).
 
 ## Relationship to Next.js 16.3
 
@@ -269,8 +282,9 @@ preferred because it keeps #3 intact; Stream stays a separate future track.
 
 - [`e2e/same-component-stale-param.spec.ts`](../e2e/same-component-stale-param.spec.ts)
   — `fixed = true`: asserts the navigation redirects without crashing (part 1).
-- [`e2e/instant-navigation.spec.ts`](../e2e/instant-navigation.spec.ts) — asserts
-  the cache-hit switch still flashes; flip `switchIsInstant` once part 2 skips the
-  loading frame on a cache-resolved, non-redirecting load.
+- [`e2e/instant-navigation.spec.ts`](../e2e/instant-navigation.spec.ts) — now
+  asserts the same-component cache-hit switch is instant (0 loading frames) on the
+  `instant`-mode ItemsPage, and that a cold cross-component nav still shows the
+  fallback.
 - [`expectInstantNavigation`](../e2e/utils.ts) — the MutationObserver-based
   helper both specs use to catch even a single-frame fallback.

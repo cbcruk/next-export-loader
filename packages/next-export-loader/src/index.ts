@@ -10,6 +10,7 @@ export { useLoaderQuery } from './use-loader-query';
 export type {
   LoaderContext,
   LoaderFn,
+  LoaderMode,
   LoaderPhase,
   ValidateQuery,
 } from './types';

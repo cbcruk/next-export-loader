@@ -46,6 +46,7 @@ export default function ItemsPage(): ReactElement {
   );
 }
 
+ItemsPage.loaderMode = 'instant';
 ItemsPage.loader = defineLoader<ItemsQuery>({
   validate: (raw) => ({
     id: typeof raw.id === 'string' ? raw.id : undefined,

@@ -12,22 +12,19 @@ const test = describeExample('basic-list-detail');
  * latches any appearance of the fallback via a MutationObserver, so it catches
  * even a single-frame flash the eye would miss.
  *
- * This spec documents a real finding. The library guarantees a *cache hit* on
- * mount (no refetch — invariant #4), but the runtime still drives every
- * navigation through `phase: 'loading'` unconditionally
- * (loader-runtime.tsx), so even a same-component cache-hit switch flashes the
- * fallback for one commit. So today's honest assertions are:
+ * Two assertions:
  *
- *   - a cold client-side navigation is NOT instant (loader runs), and
- *   - a same-query item switch is ALSO not yet instant — it's a cache hit with
- *     no refetch, but the unconditional loading phase still flashes.
+ *   - a cold client-side navigation is NOT instant (a cross-component nav runs
+ *     the loader from scratch and shows the fallback), and
+ *   - a same-component item switch on an `instant` page IS instant — the runtime
+ *     holds the last validated render (the page reads its param via
+ *     useLoaderQuery) and skips the loading frame when the loader resolves from
+ *     cache without redirecting.
  *
- * The second is the gap to close to reach true instant navigation (skip the
- * loading phase when the loader resolves from cache without redirecting). When
- * that lands, flip `switchIsInstant` to true.
+ * The second was the parked "part 2" gap; it closed once basic-list-detail's
+ * ItemsPage opted into `loaderMode = 'instant'` and moved its param read onto
+ * useLoaderQuery. See docs/instant-navigation.md.
  */
-const switchIsInstant = false;
-
 test.describe('instant navigation (loading-frame probe)', () => {
   test('a cold client-side navigation is not instant — guards the helper', async ({
     page,
@@ -50,7 +47,7 @@ test.describe('instant navigation (loading-frame probe)', () => {
     ).rejects.toThrow(/instant/);
   });
 
-  test('a same-query item switch is a cache hit but still flashes loading today', async ({
+  test('a same-component item switch on an instant page shows no loading frame', async ({
     page,
     app,
   }) => {
@@ -66,13 +63,6 @@ test.describe('instant navigation (loading-frame probe)', () => {
       ).toBeVisible();
     };
 
-    if (switchIsInstant) {
-      await expectInstantNavigation(page, 'Loading...', switchItem);
-    } else {
-      // Documents the current gap: cache hit, yet the loading phase flashes.
-      await expect(
-        expectInstantNavigation(page, 'Loading...', switchItem),
-      ).rejects.toThrow(/instant/);
-    }
+    await expectInstantNavigation(page, 'Loading...', switchItem);
   });
 });

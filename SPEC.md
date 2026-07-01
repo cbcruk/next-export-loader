@@ -146,6 +146,19 @@ export default function ItemsPage() {
 }
 ```
 
+### `Page.loaderMode`
+
+페이지 컴포넌트에 붙이는 opt-in 렌더 정책. `'block'`(기본) | `'instant'`.
+
+- `'block'` — same-component param 변경 시 loader가 새 param에 대해 settle될 때까지 `fallback`을 보여준다. 어떤 페이지든 안전하지만 cache hit switch도 한 프레임 fallback이 깜빡인다.
+- `'instant'` — loader가 settle될 때까지 **직전 검증된 렌더를 유지**한다(페이지가 이전 `useLoaderQuery` 값을 계속 읽음). cache hit switch는 loading 프레임 없이 즉시 전환되고, invalid param은 페이지에 도달하기 전에 loader가 redirect한다(invariant #3 유지). **반드시 `useLoaderQuery`로 param을 읽는 페이지에만 사용** — `useRouter().query`를 직접 읽으면 미검증 param 크래시가 다시 열린다.
+
+```tsx
+ItemsPage.loaderMode = 'instant';
+```
+
+Next.js 16.3의 "instant navigation" 야드스틱(자체 loading 프레임이 없으면 instant)을 `output: 'export'` 환경에서 만족시키는 방법. 배경은 [docs/instant-navigation.md](docs/instant-navigation.md).
+
 ### `<PrefetchLink>`
 
 `next/link` 위에 hover/focus 시 `queryClient.prefetchQuery` 호출을 얹은 컴포넌트. `next/link`의 chunk prefetch와 데이터 prefetch를 통합.
