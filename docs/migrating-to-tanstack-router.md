@@ -21,6 +21,8 @@ If you still need `next/image`, `next/head`, or other Next.js-specific features,
 | `useSuspenseQuery(opts)` | `useSuspenseQuery(opts)` | Unchanged |
 | `<PrefetchLink>` | `<Link preload="intent">` | Built-in, no wrapper needed |
 | `useLoaderPhase()` | `router.state.status` | `'idle' | 'pending'` |
+| `defineLoader({ validate })` | `validateSearch` | 둘 다 raw query → typed/coerced shape |
+| `useLoaderQuery<T>()` | `Route.useSearch()` | runtime-owned typed query; `T`는 이 라이브러리에선 수동 명시 |
 | `<LoaderRuntime>` | `<RouterProvider>` | The router itself manages the lifecycle |
 | `<LoaderDevtools>` | `<TanStackRouterDevtools>` | Built-in devtools |
 

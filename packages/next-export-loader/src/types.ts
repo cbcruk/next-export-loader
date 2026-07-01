@@ -13,12 +13,31 @@ import type { ParsedUrlQuery } from 'querystring';
 export type LoaderPhase = 'loading' | 'ready' | 'error';
 
 /**
+ * Validates and shapes the raw URL query for a route.
+ *
+ * The input is always the raw {@link ParsedUrlQuery} (string values). The output
+ * is the typed, validated `TQuery` the loader and component work with — it may
+ * hold numbers, enums, or any shape, mirroring TanStack Router's `validateSearch`.
+ * Coerce invalid params to valid defaults here instead of throwing, when you want
+ * a lighter alternative to redirect-on-invalid.
+ *
+ * @typeParam TQuery - Validated query shape produced from the raw query.
+ */
+export type ValidateQuery<TQuery = ParsedUrlQuery> = (
+  raw: ParsedUrlQuery,
+) => TQuery;
+
+/**
  * Arguments passed to a {@link LoaderFn} for a single navigation.
  *
- * @typeParam TQuery - Shape of the parsed URL query for this route.
+ * @typeParam TQuery - Shape of the query for this route. Defaults to the raw
+ *   {@link ParsedUrlQuery}; a loader with a {@link ValidateQuery} narrows it.
  */
-export interface LoaderContext<TQuery extends ParsedUrlQuery = ParsedUrlQuery> {
-  /** Parsed query string of the URL being navigated to. */
+export interface LoaderContext<TQuery = ParsedUrlQuery> {
+  /**
+   * The query for the URL being navigated to. Raw parsed strings by default, or
+   * the validated shape when the loader defines a `validate`.
+   */
   query: TQuery;
   /** The active TanStack Query client; use `ensureQueryData` to prefetch. */
   queryClient: QueryClient;
@@ -36,9 +55,15 @@ export interface LoaderContext<TQuery extends ParsedUrlQuery = ParsedUrlQuery> {
  * or throw any other error to surface the error fallback. The returned data is
  * read back in the component via `useSuspenseQuery` as a cache hit.
  *
- * @typeParam TQuery - Shape of the parsed URL query for this route.
+ * May carry an optional {@link ValidateQuery} as `validate`; `<LoaderRuntime>`
+ * runs it against the raw query before calling the loader, so `ctx.query` is the
+ * validated shape. {@link defineLoader}'s object form attaches it.
+ *
+ * @typeParam TQuery - Shape of the query for this route.
  * @see {@link defineLoader} for the type-safe way to author one.
  */
-export type LoaderFn<TQuery extends ParsedUrlQuery = ParsedUrlQuery> = (
-  ctx: LoaderContext<TQuery>,
-) => Promise<void>;
+export interface LoaderFn<TQuery = ParsedUrlQuery> {
+  (ctx: LoaderContext<TQuery>): Promise<void>;
+  /** Optional validator applied to the raw query before the loader runs. */
+  validate?: ValidateQuery<TQuery>;
+}

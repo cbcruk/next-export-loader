@@ -84,6 +84,20 @@ export const loader = defineLoader(async ({ query, queryClient, signal }) => {
 });
 ```
 
+**Object form (`validate`).** raw query를 loader 실행 전에 검증/coerce하고 싶으면 `{ validate, load }` 형태를 쓴다. `<LoaderRuntime>`이 `validate(raw)`를 먼저 실행하므로 `ctx.query`는 검증된 shape (숫자·enum 등)이 된다. TanStack Router의 `validateSearch`에 대응. invalid param을 던지지 않고 유효 default로 coerce하면 redirect-on-invalid의 가벼운 대안이 된다.
+
+```ts
+export const loader = defineLoader<{ page: number }>({
+  validate: (raw) => ({ page: Number(raw.page ?? 1) }), // invalid → 1, 크래시 없음
+  load: async ({ query, queryClient }) => {
+    query.page; // number, 검증됨 — `raw.page as string` 캐스팅 불필요
+    await queryClient.ensureQueryData(itemsQuery(query.page));
+  },
+});
+```
+
+검증된 query를 **컴포넌트**로 노출하는 `useLoaderQuery()`는 후속 phase 예정. 설계는 [docs/tanstack-inspired-improvements.md](docs/tanstack-inspired-improvements.md) 참고.
+
 ### `RedirectError`
 
 loader 내부에서 redirect를 표현하는 throw-able. 서버 환경의 `redirect()` status code와 같은 의미적 무게.
@@ -120,6 +134,18 @@ export default function App({ Component, pageProps }: AppProps) {
 
 현재 phase를 조회 (`'loading' | 'ready' | 'error'`). 일반적으로 직접 쓸 일은 없고, 글로벌 progress bar 같은 곳에서만 사용.
 
+### `useLoaderQuery<T>()`
+
+runtime이 소유한 **검증된 query**를 컴포넌트에서 읽는다. loader가 `validate`를 정의했으면 그 typed 결과를, 아니면 raw `ParsedUrlQuery`를 반환한다. 컴포넌트는 loader가 `ready`된 뒤에만 mount되므로, 반환값은 항상 현재 URL에 대해 loader가 검증한 값이다 — 페이지가 미검증 param을 보는 일이 없다. TanStack Router의 `Route.useSearch()`에 대응하며, 페이지에서 `useRouter().query`(untyped) 대신 쓴다.
+
+```tsx
+export default function ItemsPage() {
+  const { id } = useLoaderQuery<{ id: string }>(); // typed, loader-validated
+  const { data: items } = useSuspenseQuery(itemsQuery());
+  const selected = items.find((i) => i.id === id)!;
+}
+```
+
 ### `<PrefetchLink>`
 
 `next/link` 위에 hover/focus 시 `queryClient.prefetchQuery` 호출을 얹은 컴포넌트. `next/link`의 chunk prefetch와 데이터 prefetch를 통합.
@@ -134,26 +160,31 @@ export default function App({ Component, pageProps }: AppProps) {
 
 ```tsx
 // pages/items.tsx
-import { useRouter } from 'next/router';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { defineLoader, RedirectError } from 'next-export-loader';
+import { defineLoader, RedirectError, useLoaderQuery } from 'next-export-loader';
 import { itemsQuery } from '@/queries/items';
 
-export const loader = defineLoader(async ({ query, queryClient, signal }) => {
-  const items = await queryClient.ensureQueryData({ ...itemsQuery(), signal });
+interface ItemsQuery {
+  id?: string;
+}
 
-  if (!query.id && items.length > 0) {
-    throw new RedirectError(`/items?id=${items[0].id}`);
-  }
-  if (query.id && !items.some((i) => i.id === query.id)) {
-    throw new RedirectError(`/items?id=${items[0].id}`);
-  }
+export const loader = defineLoader<ItemsQuery>({
+  validate: (raw) => ({ id: typeof raw.id === 'string' ? raw.id : undefined }),
+  load: async ({ query, queryClient, signal }) => {
+    const items = await queryClient.ensureQueryData({ ...itemsQuery(), signal });
+
+    if (!query.id && items.length > 0) {
+      throw new RedirectError(`/items?id=${items[0].id}`);
+    }
+    if (query.id && !items.some((i) => i.id === query.id)) {
+      throw new RedirectError(`/items?id=${items[0].id}`);
+    }
+  },
 });
 
 export default function ItemsPage() {
-  const router = useRouter();
   const { data: items } = useSuspenseQuery(itemsQuery());
-  const selectedId = router.query.id as string;
+  const { id: selectedId } = useLoaderQuery<ItemsQuery>();
   const selected = items.find((i) => i.id === selectedId)!;
   // selectedId와 selected는 loader가 보장. fallback/조건 분기 불필요.
 
@@ -161,7 +192,7 @@ export default function ItemsPage() {
 }
 ```
 
-`useEffect` 없음, 조건 분기 없음, fallback 분기 없음.
+`useEffect` 없음, 조건 분기 없음, fallback 분기 없음. 페이지는 `useRouter().query`(untyped) 대신 `useLoaderQuery<T>()`로 loader가 검증한 typed query를 읽는다.
 
 ## 패키지 구조
 
@@ -249,7 +280,7 @@ next-export-loader/
 - **자체 routing**: `next/router`를 대체하지 않는다. 위에 얹는다.
 - **자체 query client**: TanStack Query에 의존한다. 자체 캐시를 만들지 않는다.
 - **server-only mode**: SSR 환경에서는 그냥 `getServerSideProps` / App Router를 써라.
-- **search params 검증**: zod 등을 강제하지 않는다. 사용자가 loader 내부에서 검증한다 (Phase 3에서 헬퍼 검토).
+- **search params 검증**: zod 등을 강제하지 않는다. 단, `defineLoader`의 object form이 optional `validate` hook을 제공하므로 사용자가 원하는 검증 라이브러리(zod 등)를 자유롭게 꽂을 수 있다 (강제 아님).
 - **data mutation**: useMutation은 그대로 TanStack Query를 쓴다.
 
 ## 알려진 한계 (정직하게 명시)
@@ -267,7 +298,7 @@ next-export-loader/
    `next/link`의 prefetch는 chunk만 가져온다. 데이터 prefetch는 `<PrefetchLink>`를 써야 한다. 사용자가 일반 `<Link>`를 쓰면 hover 시 chunk만, 클릭 시 loader가 데이터 fetch — 즉 두 번의 latency가 직렬화될 수 있다.
 
 5. **타입 안정성은 TanStack Router 수준에 못 미친다.**
-   `loader`가 페이지의 정적 export이기 때문에 search params 타입을 컴포넌트로 forward하는 것이 제한적이다. 사용자가 zod 등으로 옆에 스키마를 두는 식으로 보강해야 한다.
+   `defineLoader`의 `validate` + `useLoaderQuery<T>()`로 typed·검증된 query를 컴포넌트로 forward할 수 있지만(→ `Route.useSearch()`에 근접), `T`를 loader와 컴포넌트 양쪽에 수동으로 명시해야 한다. TanStack Router는 routeTree codegen으로 이를 자동 추론하는데, 자체 routing을 갖지 않는 이 라이브러리는 거기까지 갈 수 없다.
 
 ## 비교
 

@@ -42,6 +42,58 @@ describe('defineLoader', () => {
   });
 });
 
+describe('defineLoader object form (validate)', () => {
+  it('bare-function form still returns the same function', () => {
+    const fn = async (): Promise<void> => {};
+    assert.strictEqual(defineLoader(fn), fn);
+  });
+
+  it('attaches validate from the definition object', () => {
+    const validate = (raw: { page?: string | string[] }): { page: number } => ({
+      page: Number(raw.page ?? 1),
+    });
+    const loader = defineLoader({
+      validate,
+      load: async () => {},
+    });
+    assert.strictEqual(loader.validate, validate);
+  });
+
+  it('leaves validate undefined when the object omits it', () => {
+    const loader = defineLoader({ load: async () => {} });
+    assert.strictEqual(loader.validate, undefined);
+  });
+
+  it('load receives whatever query the caller passes as ctx.query', async () => {
+    const captured: { query: { page: number } | null } = { query: null };
+    const loader = defineLoader<{ page: number }>({
+      validate: (raw) => ({ page: Number(raw.page ?? 1) }),
+      load: async ({ query }) => {
+        captured.query = query;
+      },
+    });
+
+    await loader({
+      query: { page: 2 },
+      queryClient: new QueryClient(),
+      signal: new AbortController().signal,
+    });
+
+    assert.deepStrictEqual(captured.query, { page: 2 });
+  });
+
+  it('validate coerces the raw query to the typed shape', () => {
+    const loader = defineLoader<{ page: number }>({
+      validate: (raw) => ({ page: Number(raw.page ?? 1) }),
+      load: async () => {},
+    });
+
+    assert.ok(loader.validate);
+    assert.deepStrictEqual(loader.validate({ page: '5' }), { page: 5 });
+    assert.deepStrictEqual(loader.validate({}), { page: 1 });
+  });
+});
+
 describe('loader query cache invariant', () => {
   it('component reads loader-prefetched data as a cache hit (no refetch)', async () => {
     let fetchCount = 0;

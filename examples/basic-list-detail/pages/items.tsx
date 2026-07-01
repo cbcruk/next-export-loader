@@ -1,13 +1,20 @@
 import type { ReactElement } from 'react';
-import { useRouter } from 'next/router';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { defineLoader, PrefetchLink, RedirectError } from 'next-export-loader';
+import {
+  defineLoader,
+  PrefetchLink,
+  RedirectError,
+  useLoaderQuery,
+} from 'next-export-loader';
 import { itemsQuery } from '@/queries/items';
 
+interface ItemsQuery {
+  id?: string;
+}
+
 export default function ItemsPage(): ReactElement {
-  const router = useRouter();
   const { data: items } = useSuspenseQuery(itemsQuery());
-  const selectedId = router.query.id as string;
+  const { id: selectedId } = useLoaderQuery<ItemsQuery>();
   const selected = items.find((i) => i.id === selectedId)!;
 
   return (
@@ -39,8 +46,11 @@ export default function ItemsPage(): ReactElement {
   );
 }
 
-ItemsPage.loader = defineLoader<{ id?: string }>(
-  async ({ query, queryClient }) => {
+ItemsPage.loader = defineLoader<ItemsQuery>({
+  validate: (raw) => ({
+    id: typeof raw.id === 'string' ? raw.id : undefined,
+  }),
+  load: async ({ query, queryClient }) => {
     const items = await queryClient.ensureQueryData(itemsQuery());
 
     if (!query.id && items.length > 0) {
@@ -50,4 +60,4 @@ ItemsPage.loader = defineLoader<{ id?: string }>(
       throw new RedirectError(`/items?id=${items[0]!.id}`);
     }
   },
-);
+});

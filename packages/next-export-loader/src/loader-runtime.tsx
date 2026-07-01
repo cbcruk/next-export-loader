@@ -12,6 +12,8 @@ import { isRedirectError } from './redirect-error';
 import { getDevtoolsStore } from './internal/devtools-store';
 import { createNavigationId, isLatestNavigation } from './internal/navigation-id';
 import { parseUrl } from './internal/parse-url';
+import { LoaderQueryContext } from './use-loader-query';
+import type { ParsedUrlQuery } from 'querystring';
 import type { LoaderPhase } from './types';
 import type { PageWithLoader } from './internal/types';
 import { LoaderPhaseContext, type LoaderPhaseStore } from './use-loader-phase';
@@ -37,6 +39,13 @@ interface LoaderState {
    * skip a redirect — before the loader settles.
    */
   readyPath: string | null;
+  /**
+   * The validated query the loader resolved for `readyPath` — the value
+   * {@link useLoaderQuery} exposes to the page. Held across a subsequent
+   * loading window (not cleared on reset) so it always reflects the last
+   * validated navigation.
+   */
+  readyQuery: unknown;
 }
 
 /**
@@ -84,6 +93,7 @@ export function LoaderRuntime({
     error: null,
     readyComponent: null,
     readyPath: null,
+    readyQuery: {},
   });
 
   // Synchronously fall back to loading when the navigation target changes —
@@ -99,6 +109,7 @@ export function LoaderRuntime({
       error: null,
       readyComponent: null,
       readyPath: null,
+      readyQuery: state.readyQuery,
     });
   }
 
@@ -140,6 +151,7 @@ export function LoaderRuntime({
         error: null,
         readyComponent: Component,
         readyPath: router.asPath,
+        readyQuery: parseUrl(router.asPath),
       });
       setPhase('ready');
       return;
@@ -150,8 +162,10 @@ export function LoaderRuntime({
     setPhase('loading');
 
     const run = async (): Promise<void> => {
+      let query: ParsedUrlQuery = {};
       try {
-        const query = parseUrl(router.asPath);
+        const raw = parseUrl(router.asPath);
+        query = loader.validate ? loader.validate(raw) : raw;
         await loader({
           query,
           queryClient: queryClientRef.current,
@@ -165,12 +179,13 @@ export function LoaderRuntime({
           if (redirectCountRef.current > MAX_REDIRECTS) {
             redirectCountRef.current = 0;
             devtools?.completeNavigation(navId, 'error', 'Too many redirects');
-            setState({
+            setState((prev) => ({
               phase: 'error',
               error: new Error('Too many redirects'),
               readyComponent: null,
               readyPath: null,
-            });
+              readyQuery: prev.readyQuery,
+            }));
             setPhase('error');
             return;
           }
@@ -186,12 +201,13 @@ export function LoaderRuntime({
         const message =
           error instanceof Error ? error.message : String(error);
         devtools?.completeNavigation(navId, 'error', message);
-        setState({
+        setState((prev) => ({
           phase: 'error',
           error,
           readyComponent: null,
           readyPath: null,
-        });
+          readyQuery: prev.readyQuery,
+        }));
         setPhase('error');
         return;
       }
@@ -205,6 +221,7 @@ export function LoaderRuntime({
         error: null,
         readyComponent: Component,
         readyPath: router.asPath,
+        readyQuery: query,
       });
       setPhase('ready');
     };
@@ -225,11 +242,13 @@ export function LoaderRuntime({
 
   return (
     <LoaderPhaseContext.Provider value={store}>
-      {isReady
-        ? children
-        : state.phase === 'error'
-          ? errorFallback
-          : fallback}
+      <LoaderQueryContext.Provider value={state.readyQuery}>
+        {isReady
+          ? children
+          : state.phase === 'error'
+            ? errorFallback
+            : fallback}
+      </LoaderQueryContext.Provider>
     </LoaderPhaseContext.Provider>
   );
 }
