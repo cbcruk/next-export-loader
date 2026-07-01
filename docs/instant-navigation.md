@@ -20,8 +20,9 @@ part that deliberately did not.
 - **Shipped:** readiness is now tracked per navigation (`readyPath`), so the
   loader re-runs and the page waits for it before rendering the new param. The
   crash and the invariant-#3 violation are fixed.
-- **Not shipped:** the cache-hit flash. Removing it needs a held-render
-  mechanism (Stream mode), out of scope here.
+- **Parked:** removing the cache-hit flash (part 2). Probes proved it's
+  achievable without Suspense, but every viable freeze mechanism costs more than a
+  1-frame flash is worth in the current architecture. See "Part 2 design" below.
 
 Pinned by [`e2e/same-component-stale-param.spec.ts`](../e2e/same-component-stale-param.spec.ts)
 (crash — now green) and [`e2e/instant-navigation.spec.ts`](../e2e/instant-navigation.spec.ts)
@@ -118,9 +119,9 @@ navigation is "instant" when no loading frame of its own appears.
   the new param early — but it still shows a fallback frame, so it is not yet
   "instant" by the 16.3 yardstick.
 - Making same-component cache hits genuinely instant (no frame at all) is part 2.
-  Probes show it's achievable by deferring the loading commit + holding the last
-  ready snapshot — no `<Suspense>` needed — but it collides with the crash fix and
-  needs the design worked out below.
+  Probes show the *timing* is achievable without `<Suspense>`, but freezing what
+  the page sees isn't possible through `_app`'s children — so part 2 is parked.
+  See "Part 2 design" below.
 - A separate, larger **Stream** mode (mount immediately, `useSuspenseQuery`
   suspends inside `<Suspense>`) would trade away invariant #3 by construction, so
   it's the non-preferred track. See "Part 2 design" below.
@@ -166,29 +167,50 @@ yet it also cannot show a fallback without a frame. The only way to have both is
 not the *live* component (it would re-read the new `router.query` and crash), but a
 frozen snapshot of the previous ready output.
 
-### Candidate: hold the last-ready snapshot
+### Rejected candidate: hold the last-ready `children` element
 
-Keep the render gate at `readyPath === router.asPath` (preserving the crash fix),
-but when the gate is false, render a **frozen snapshot of the last ready children**
-instead of the fallback — then swap to the live children the instant the loader
-commits the new `readyPath`. On a cache hit that swap is within a microtask, so the
-user sees no flash; on a cache miss the snapshot holds until data arrives (or the
-fallback takes over after a threshold, TBD).
+The natural idea: keep the gate at `readyPath === router.asPath`, but when it's
+false render a saved snapshot of the last ready `children` instead of the fallback,
+then swap to the live children once the loader commits the new `readyPath`.
 
-Open questions this raises (why it needs design, not just code):
+**A probe rejected this.** Saving the previous `children` element in a ref and
+rendering it while the gate is false still **crashes** on an invalid-id nav:
 
-- **Freezing a React subtree.** The snapshot must not re-read `router.query`.
-  Options: capture the previous `children` element and render it inside a provider
-  that pins the old query; or have `LoaderRuntime` own an off-router "displayed
-  location" that the page reads instead of `useRouter` directly (larger API change).
-- **Stale-data window.** Holding the old snapshot means the user briefly sees the
-  *previous* item's content after clicking — acceptable for a fast cache hit,
-  questionable for a slow miss. Needs a max-hold threshold before falling back.
-- **Opt-in surface.** Whether this is always-on (correct Block, no flash) or an
-  explicit `mode: 'stream'` per route. The probe suggests always-on is viable for
-  cache hits; misses are where an opt-in might matter.
-- **Interaction with `useLoaderPhase`.** During the hold the phase is "loading"
-  but the screen shows content — the progress bar semantics need a decision.
+```tsx
+const lastChildrenRef = useRef(null);
+if (isReady) lastChildrenRef.current = children;
+// gate false → render lastChildrenRef.current  ← still crashes on /items?id=999
+```
+
+A React element is a render instruction, not a snapshot. Rendering the saved
+element re-invokes `ItemsPage`, which calls `useRouter()` and reads the **new**
+`?id=999` — the same crash. So **nothing reachable through `_app`'s `children` can
+be frozen**: the page owns its `useRouter()` read, and the runtime sits above it
+with no way to pin what the page sees.
+
+### Why part 2 is blocked in the current architecture
+
+To have both instant *and* safe, the page must not observe a param the loader
+hasn't validated — but the page reads `router.query` **directly**, outside the
+runtime's control. The only mechanisms that would actually work each cost more than
+the 1-frame flash is worth:
+
+- **Controlled location** — the page reads a runtime-owned query (e.g.
+  `useLoaderQuery()`) instead of `useRouter()`. This works, but it changes **every
+  page's code** and undoes the library's core pitch ("attach a loader to an
+  ordinary Next page"). It also can't be enforced — a stray `useRouter()` re-opens
+  the crash.
+- **DOM snapshot** — clone the previous subtree's DOM and hold it outside React
+  until the loader settles. Hacky, breaks events/focus/accessibility, and fights
+  React's ownership of the DOM.
+
+Given part 1 already fixed the real bug (the crash / invariant-#3 violation) and
+part 2 is a cosmetic 1-frame flash, the cost/benefit doesn't justify either path in
+the current architecture. Part 2 is **parked**, with the probe results above so a
+future attempt starts from these facts rather than re-deriving them.
+
+If it's ever revisited, an opt-in `mode: 'stream'` scoped to controlled-location
+pages is the least-bad route — the API cost is contained to pages that opt in.
 
 ### Not this: mount-before-loader Stream
 
