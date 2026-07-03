@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>next-export-loader — live examples</title>
+    <meta
+      name="description"
+      content="Runnable examples of next-export-loader: a server-like loader lifecycle for the Next.js Pages Router under output: 'export'."
+    />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --fg: #1a1a1a;
+        --muted: #666;
+        --border: #e5e5e5;
+        --card: #fafafa;
+        --accent: #0070f3;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0a0a0a;
+          --fg: #ededed;
+          --muted: #999;
+          --border: #262626;
+          --card: #141414;
+          --accent: #3b91ff;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 64px 24px 96px;
+      }
+      header {
+        margin-bottom: 40px;
+      }
+      h1 {
+        font-size: 2rem;
+        margin: 0 0 8px;
+        letter-spacing: -0.02em;
+      }
+      .tagline {
+        color: var(--muted);
+        margin: 0 0 16px;
+        font-size: 1.05rem;
+      }
+      .links a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      .links a:hover {
+        text-decoration: underline;
+      }
+      ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 12px;
+      }
+      li a {
+        display: block;
+        padding: 18px 20px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--card);
+        color: inherit;
+        text-decoration: none;
+        transition: border-color 0.15s ease, transform 0.15s ease;
+      }
+      li a:hover {
+        border-color: var(--accent);
+        transform: translateY(-1px);
+      }
+      .name {
+        font-weight: 600;
+        font-size: 1.05rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .name code {
+        font-size: 0.95em;
+      }
+      .arrow {
+        color: var(--muted);
+        margin-left: auto;
+      }
+      .desc {
+        color: var(--muted);
+        margin: 6px 0 0;
+        font-size: 0.95rem;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: var(--border);
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+      footer {
+        margin-top: 48px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      footer a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      footer a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>next-export-loader</h1>
+        <p class="tagline">
+          A server-like loader lifecycle for the Next.js Pages Router under
+          <code>output: 'export'</code> — the page component doesn't mount until
+          its data is ready.
+        </p>
+        <p class="links">
+          <a href="https://github.com/cbcruk/next-export-loader"
+            >GitHub&nbsp;repository&nbsp;↗</a
+          >
+        </p>
+      </header>
+
+      <ul>
+        <li>
+          <a href="./basic-list-detail/">
+            <span class="name"
+              ><code>basic-list-detail</code
+              ><span class="arrow">→</span></span
+            >
+            <p class="desc">
+              Loader basics, cache hits, navigation race, progress bar, devtools.
+            </p>
+          </a>
+        </li>
+        <li>
+          <a href="./auth-gated/">
+            <span class="name"
+              ><code>auth-gated</code><span class="arrow">→</span></span
+            >
+            <p class="desc">Redirect-before-mount auth gating.</p>
+          </a>
+        </li>
+        <li>
+          <a href="./permission-gated/">
+            <span class="name"
+              ><code>permission-gated</code><span class="arrow">→</span></span
+            >
+            <p class="desc">
+              Permission-based guards over a router-agnostic core: guard factory,
+              redirect-return, 3-state session, token refresh.
+            </p>
+          </a>
+        </li>
+        <li>
+          <a href="./dynamic-routes/">
+            <span class="name"
+              ><code>dynamic-routes</code><span class="arrow">→</span></span
+            >
+            <p class="desc">
+              Query-param routes, <code>errorFallback</code> on a failed loader.
+            </p>
+          </a>
+        </li>
+        <li>
+          <a href="./search-with-suggest/">
+            <span class="name"
+              ><code>search-with-suggest</code
+              ><span class="arrow">→</span></span
+            >
+            <p class="desc">
+              Per-query keys and search-driven navigation races.
+            </p>
+          </a>
+        </li>
+      </ul>
+
+      <footer>
+        Built with <code>output: 'export'</code> and deployed to GitHub Pages.
+        Each example is an independent static Next.js app.
+      </footer>
+    </main>
+  </body>
+</html>

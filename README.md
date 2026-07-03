@@ -147,15 +147,17 @@ The bundled [ESLint plugin](docs/eslint-plugin.md) enforces the `useSuspenseQuer
 
 ## Examples
 
-Runnable apps in [`examples/`](examples/):
+Runnable apps in [`examples/`](examples/), each deployed live to GitHub Pages — start at the [demo index](https://cbcruk.github.io/next-export-loader/):
 
-| Example | Demonstrates |
-| --- | --- |
-| [`basic-list-detail`](examples/basic-list-detail) | Loader basics, cache hits, navigation race, progress bar, devtools |
-| [`auth-gated`](examples/auth-gated) | Redirect-before-mount auth gating |
-| [`permission-gated`](examples/permission-gated) | Permission-based guards over a router-agnostic core: guard factory, redirect-return, 3-state session, token refresh |
-| [`dynamic-routes`](examples/dynamic-routes) | Query-param routes, `errorFallback` on a failed loader |
-| [`search-with-suggest`](examples/search-with-suggest) | Per-query keys and search-driven navigation races |
+| Example | Live demo | Demonstrates |
+| --- | --- | --- |
+| [`basic-list-detail`](examples/basic-list-detail) | [demo](https://cbcruk.github.io/next-export-loader/basic-list-detail/) | Loader basics, cache hits, navigation race, progress bar, devtools |
+| [`auth-gated`](examples/auth-gated) | [demo](https://cbcruk.github.io/next-export-loader/auth-gated/) | Redirect-before-mount auth gating |
+| [`permission-gated`](examples/permission-gated) | [demo](https://cbcruk.github.io/next-export-loader/permission-gated/) | Permission-based guards over a router-agnostic core: guard factory, redirect-return, 3-state session, token refresh |
+| [`dynamic-routes`](examples/dynamic-routes) | [demo](https://cbcruk.github.io/next-export-loader/dynamic-routes/) | Query-param routes, `errorFallback` on a failed loader |
+| [`search-with-suggest`](examples/search-with-suggest) | [demo](https://cbcruk.github.io/next-export-loader/search-with-suggest/) | Per-query keys and search-driven navigation races |
+
+The demos are published by [`.github/workflows/deploy-examples.yml`](.github/workflows/deploy-examples.yml) on every push to `main`. Each example is built as a standalone `output: 'export'` site under its own sub-path. **One-time setup:** in the repo's **Settings → Pages**, set **Source** to **GitHub Actions** — no secrets or tokens needed. Run the examples locally with `pnpm --filter example-basic-list-detail dev`.
 
 ## Documentation
 

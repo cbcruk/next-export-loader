@@ -39,7 +39,11 @@ export function requirePermissions(
       requiredPermissions,
       // Loaders run client-side (inside LoaderRuntime's effect), so
       // window.location is the accurate current path to return to after login.
-      currentPath: window.location.pathname + window.location.search,
+      // Strip the configured basePath (empty at the root, `/foo` when the app is
+      // served from a sub-path, e.g. on GitHub Pages) so the returned path is
+      // router-relative — otherwise next/router re-prepends basePath and the
+      // post-login redirect double-prefixes.
+      currentPath: currentRouterPath(),
     });
 
     if (result.type === 'redirect') {
@@ -51,6 +55,22 @@ export function requirePermissions(
 /** Authentication only, no specific permission. */
 export function requireAuth(): LoaderFn {
   return requirePermissions();
+}
+
+/**
+ * The current path as next/router sees it — `window.location` minus the
+ * configured basePath. Next inlines the basePath into
+ * `process.env.__NEXT_ROUTER_BASEPATH` at build time (the same value its own
+ * router uses to strip basePath off `window.location`), so this stays correct
+ * whether the app is served from the root or a sub-path.
+ */
+function currentRouterPath(): string {
+  const basePath = process.env.__NEXT_ROUTER_BASEPATH ?? '';
+  const full = window.location.pathname + window.location.search;
+  if (basePath && full.startsWith(basePath)) {
+    return full.slice(basePath.length) || '/';
+  }
+  return full;
 }
 
 function withSearch(
