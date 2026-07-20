@@ -26,6 +26,18 @@ A **loader** is an async function attached to a page. `<LoaderRuntime>` runs it 
 
 Data fetching is built on [TanStack Query](https://tanstack.com/query).
 
+## When to use this
+
+This library fills one specific corner: **Pages Router + `output: 'export'`, with no server at request time.** Pick by what you deploy onto:
+
+| Your situation | Use |
+| --- | --- |
+| You have a server (Vercel, Node, edge) | **Not this.** App Router + seed client caches from Server Components. See Vercel's [Next.js SPA patterns](https://github.com/vercel-labs/next-spa-patterns), the runnable companion to the [Single-Page Applications guide](https://nextjs.org/docs/app/guides/single-page-applications). |
+| You ship a **fully static** bundle — GitHub Pages, S3/CloudFront, a WebView-packaged desktop/mobile app, an internal/air-gapped tool | **This library.** There is no server to seed from, so the "data ready before mount" guarantee is enforced on the client. |
+| Greenfield, free to choose the router | Prefer App Router, or [TanStack Router](docs/migrating-to-tanstack-router.md) for a first-class client loader. This library is for when leaving Pages Router + export isn't on the table. |
+
+The **client contract is the same across all three** — define a query once, read it with `useSuspenseQuery` as a cache hit; only the *seed source* differs (a Server Component, this library's client loader, or a router loader). That's why the SPA-guide patterns and this library share the exact same component code. Full breakdown in [SPEC.md](SPEC.md#비교).
+
 ## Install
 
 ```bash
@@ -164,6 +176,7 @@ The demos are published by [`.github/workflows/deploy-examples.yml`](.github/wor
 - [ESLint plugin](docs/eslint-plugin.md) — install and configure `no-use-query`.
 - [Migrating to TanStack Router](docs/migrating-to-tanstack-router.md) — when you outgrow static export.
 - [Instant navigation & the same-component loading gap](docs/instant-navigation.md) — a design note on a known same-component navigation bug and the proposed fix.
+- [Shallow navigation](docs/shallow-navigation.md) — a design note (not shipped) on loader-free view-only param switches, prompted by the SPA guide's shallow-routing pattern.
 
 ## Status
 
