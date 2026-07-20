@@ -11,6 +11,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { isRedirectError } from './redirect-error';
 import { getDevtoolsStore } from './internal/devtools-store';
 import { createNavigationId, isLatestNavigation } from './internal/navigation-id';
+import {
+  isShallowNavigation,
+  releaseShallowNavigation,
+} from './internal/shallow-nav';
 import { parseUrl } from './internal/parse-url';
 import { LoaderQueryContext } from './use-loader-query';
 import type { ParsedUrlQuery } from 'querystring';
@@ -112,6 +116,17 @@ export function LoaderRuntime({
     state.phase === 'ready' &&
     isSameComponentParamChange;
 
+  // Shallow navigation (via `shallowPush`): a same-component, view-only URL
+  // change over already-loaded data. Hold the current render across it exactly
+  // like `instant` — the page keeps showing its last validated view until the
+  // effect swaps in the new (validate-only) query, with no fallback and no
+  // loader run. Independent of `loaderMode`, since shallowness is a property of
+  // the transition, not the page.
+  const holdForShallow =
+    state.phase === 'ready' &&
+    isSameComponentParamChange &&
+    isShallowNavigation(router.asPath);
+
   // Synchronously fall back to loading when the navigation target changes —
   // either a different component OR a same-component param change. Doing this
   // during render (not in the effect) keeps the page from rendering the new
@@ -119,7 +134,8 @@ export function LoaderRuntime({
   if (
     state.readyComponent !== null &&
     (state.readyComponent !== Component || state.readyPath !== router.asPath) &&
-    !holdForInstant
+    !holdForInstant &&
+    !holdForShallow
   ) {
     setState({
       phase: 'loading',
@@ -152,6 +168,36 @@ export function LoaderRuntime({
   );
 
   useEffect(() => {
+    // Shallow navigation: skip the loader entirely and just advance the
+    // runtime-owned query (validate-only) so useLoaderQuery sees the new param.
+    // No fetch, no redirect guard, no fallback — safe because the caller asserts
+    // the param is valid-by-construction (chosen from loaded data) and needs no
+    // new data. Only on the same, already-ready component; otherwise fall through
+    // to a full run so misuse can't skip a guard. Matched by value (not
+    // consumed), so a StrictMode re-invoke re-commits the same result.
+    if (
+      isShallowNavigation(router.asPath) &&
+      readyComponentRef.current === Component
+    ) {
+      const shallowLoader = Component.loader;
+      const raw = parseUrl(router.asPath);
+      const query = shallowLoader?.validate
+        ? shallowLoader.validate(raw)
+        : raw;
+      redirectCountRef.current = 0;
+      setState({
+        phase: 'ready',
+        error: null,
+        readyComponent: Component,
+        readyPath: router.asPath,
+        readyQuery: query,
+      });
+      setPhase('ready');
+      return;
+    }
+    // A real navigation to a different path voids any stale shallow intent.
+    releaseShallowNavigation(router.asPath);
+
     const devtools = getDevtoolsStore();
     const componentName =
       Component.displayName ?? Component.name ?? 'Unknown';
@@ -286,7 +332,7 @@ export function LoaderRuntime({
   const isReady =
     state.phase === 'ready' &&
     state.readyComponent === Component &&
-    (state.readyPath === router.asPath || holdForInstant);
+    (state.readyPath === router.asPath || holdForInstant || holdForShallow);
 
   return (
     <LoaderPhaseContext.Provider value={store}>

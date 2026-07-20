@@ -26,6 +26,18 @@ A **loader** is an async function attached to a page. `<LoaderRuntime>` runs it 
 
 Data fetching is built on [TanStack Query](https://tanstack.com/query).
 
+## When to use this
+
+This library fills one specific corner: **Pages Router + `output: 'export'`, with no server at request time.** Pick by what you deploy onto:
+
+| Your situation | Use |
+| --- | --- |
+| You have a server (Vercel, Node, edge) | **Not this.** App Router + seed client caches from Server Components. See Vercel's [Next.js SPA patterns](https://github.com/vercel-labs/next-spa-patterns), the runnable companion to the [Single-Page Applications guide](https://nextjs.org/docs/app/guides/single-page-applications). |
+| You ship a **fully static** bundle — GitHub Pages, S3/CloudFront, a WebView-packaged desktop/mobile app, an internal/air-gapped tool | **This library.** There is no server to seed from, so the "data ready before mount" guarantee is enforced on the client. |
+| Greenfield, free to choose the router | Prefer App Router, or [TanStack Router](docs/migrating-to-tanstack-router.md) for a first-class client loader. This library is for when leaving Pages Router + export isn't on the table. |
+
+The **client contract is the same across all three** — define a query once, read it with `useSuspenseQuery` as a cache hit; only the *seed source* differs (a Server Component, this library's client loader, or a router loader). That's why the SPA-guide patterns and this library share the exact same component code. Full breakdown in [SPEC.md](SPEC.md#비교).
+
 ## Install
 
 ```bash
@@ -108,8 +120,9 @@ The component never renders a loading state of its own — by the time it mounts
 | `useLoaderPhase()` | Reads the current phase (`'loading' \| 'ready' \| 'error'`) — for progress bars in your app shell. |
 | `<PrefetchLink>` | A `next/link` that warms the destination's queries on hover/focus. |
 | `<LoaderDevtools>` | A floating dev panel logging recent navigations (phase, duration, redirects, errors). |
+| `shallowPush(url)` | Navigate for a view-only URL change (sort/filter/select over loaded data) **without running the loader**. Prototype — see below. |
 
-Exported types: `LoaderContext`, `LoaderFn`, `LoaderPhase`, `NavigationEntry`, `PrefetchableQuery`, `PrefetchLinkProps`, `RedirectOptions`.
+Exported types: `LoaderContext`, `LoaderFn`, `LoaderPhase`, `NavigationEntry`, `PrefetchableQuery`, `PrefetchLinkProps`, `RedirectOptions`, `ShallowPushOptions`.
 
 ### Redirects
 
@@ -134,6 +147,19 @@ import { PrefetchLink } from 'next-export-loader';
 
 On hover or focus, the listed queries are warmed so the destination's loader resolves from cache.
 
+### Shallow navigation (prototype)
+
+When a URL change only re-derives a view over data the loader has **already loaded** — a URL-backed sort, filter, tab, or selection — running the loader again is wasted work. `shallowPush` updates the URL and the params your page reads via `useLoaderQuery`, but skips the loader entirely: no fetch, no loading frame, no `beforeLoad` guard.
+
+```tsx
+import { shallowPush, useLoaderQuery } from 'next-export-loader';
+
+const { sort } = useLoaderQuery<{ sort: 'name' | 'price' }>();
+<button onClick={() => shallowPush('/list?sort=price')}>Sort by price</button>;
+```
+
+Use it only when the new param is valid **by construction** (chosen from already-loaded, already-authorized state) — a param that could fail validation or redirect must use an ordinary navigation so the loader can guard it. It's the static-export analog of the [SPA guide's shallow-routing pattern](https://nextjs.org/docs/app/guides/single-page-applications). See the [`shallow-list-filter`](examples/shallow-list-filter) example and the [design note](docs/shallow-navigation.md) for the full rationale and invariant trade-offs.
+
 ## Data-fetching rules
 
 These keep the cache-hit invariant intact:
@@ -156,6 +182,7 @@ Runnable apps in [`examples/`](examples/), each deployed live to GitHub Pages �
 | [`permission-gated`](examples/permission-gated) | [demo](https://cbcruk.github.io/next-export-loader/permission-gated/) | Permission-based guards over a router-agnostic core: guard factory, redirect-return, 3-state session, token refresh |
 | [`dynamic-routes`](examples/dynamic-routes) | [demo](https://cbcruk.github.io/next-export-loader/dynamic-routes/) | Query-param routes, `errorFallback` on a failed loader |
 | [`search-with-suggest`](examples/search-with-suggest) | [demo](https://cbcruk.github.io/next-export-loader/search-with-suggest/) | Per-query keys and search-driven navigation races |
+| [`shallow-list-filter`](examples/shallow-list-filter) | [demo](https://cbcruk.github.io/next-export-loader/shallow-list-filter/) | URL-backed sort/filter via `shallowPush` — view-only changes that skip the loader (prototype) |
 
 The demos are published by [`.github/workflows/deploy-examples.yml`](.github/workflows/deploy-examples.yml) on every push to `main`. Each example is built as a standalone `output: 'export'` site under its own sub-path. **One-time setup:** in the repo's **Settings → Pages**, set **Source** to **GitHub Actions** — no secrets or tokens needed. Run the examples locally with `pnpm --filter example-basic-list-detail dev`.
 
@@ -164,6 +191,7 @@ The demos are published by [`.github/workflows/deploy-examples.yml`](.github/wor
 - [ESLint plugin](docs/eslint-plugin.md) — install and configure `no-use-query`.
 - [Migrating to TanStack Router](docs/migrating-to-tanstack-router.md) — when you outgrow static export.
 - [Instant navigation & the same-component loading gap](docs/instant-navigation.md) — a design note on a known same-component navigation bug and the proposed fix.
+- [Shallow navigation](docs/shallow-navigation.md) — a design note (not shipped) on loader-free view-only param switches, prompted by the SPA guide's shallow-routing pattern.
 
 ## Status
 

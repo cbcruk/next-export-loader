@@ -52,7 +52,7 @@ jobs:
           REPO: ${{ github.event.repository.name }}
         run: |
           set -euo pipefail
-          examples="basic-list-detail auth-gated permission-gated dynamic-routes search-with-suggest"
+          examples="basic-list-detail auth-gated permission-gated dynamic-routes search-with-suggest shallow-list-filter"
           rm -rf dist
           mkdir -p dist
           for ex in $examples; do
