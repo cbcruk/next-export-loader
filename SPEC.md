@@ -331,6 +331,20 @@ next-export-loader/
 
 **언제 next-export-loader를 쓰는가?** Pages Router + export를 떠날 수 없는데 loader 패턴이 절실할 때. 위 셋 중 가장 좁은 niche이지만, 그 niche의 사용자에게는 가장 적합한 도구.
 
+### 서버 인센티브 스펙트럼에서의 위치
+
+"loader로 데이터를 먼저 준비한다"는 아이디어 자체는 새롭지 않다. 차이는 **그 데이터를 누가 심느냐(seed)**이고, 이는 곧 **서버를 얼마나 쓰느냐**의 연속선이다:
+
+```
+순수 SSR/RSC ───── 서버-시드 SPA ───── 정적 + 클라 loader (이 라이브러리)
+서버가 매 navigation    서버가 RSC에서 시드 →      서버 없음. 클라 loader가
+의 데이터를 소유         스트리밍 → 클라가 소유      시드까지 소유
+```
+
+가운데의 "서버-시드 SPA"는 [Vercel의 Next.js SPA 가이드](https://github.com/vercel-labs/next-spa-patterns)가 다루는 지점이다. RSC에서 `prefetchQuery`를 **await 없이** 시작해 HTML로 스트리밍하고, 클라의 `useSuspenseQuery`가 같은 key로 받아 이어간다. 클라이언트 계약(shared `queryOptions` → `useSuspenseQuery` cache hit)은 **이 라이브러리와 동일**하다 — 다른 건 시드의 출처(RSC냐 클라 loader냐)뿐이다. 이 사실은 우리 invariant #3의 계약이 first-party가 권장하는 것과 같은 계약임을 확인해준다.
+
+주목할 점은 그 가이드의 대표 패턴이 **순수 클라가 아니라 서버-시드**라는 것이다. 이는 우연이 아니다 — 서버/엣지 컴퓨트를 파는 플랫폼은 "서버가 필요한 형태의 SPA"를 밀 인센티브가 있고, 반대로 **서버 없이 어디든(GitHub Pages, S3, WebView) 올라가는 순수 정적 loader**는 락인이 없어 first-party가 구조적으로 소홀할 수밖에 없는 영역이다. 즉 이 라이브러리가 채우는 지점은 서버를 파는 조직이 잘 안 채우는 지점이고, 그래서 서드파티로 존재할 이유가 있다. (그 가이드 스스로도 `output: 'export'`에서는 코어 패턴이 동작하지 않고 `browser-only`·`shallow-routing`만 남는다고 명시한다.)
+
 ## References
 
 - TkDodo, [Breaking React Query's API on purpose](https://tkdodo.eu/blog/breaking-react-querys-api-on-purpose)
@@ -338,3 +352,4 @@ next-export-loader/
 - TanStack Query Discussion [#5279](https://github.com/TanStack/query/discussions/5279)
 - TanStack Router [loader docs](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading)
 - Remix [loader convention](https://remix.run/docs/en/main/route/loader)
+- Vercel Labs [next-spa-patterns](https://github.com/vercel-labs/next-spa-patterns) — App Router에서 RSC로 클라 캐시를 시드하는 "서버-시드 SPA" 패턴 모음 (서버 필요)
