@@ -2,11 +2,22 @@
 
 A design note. Records an idea for the *other half* of the same-component
 navigation problem, prompted by the [Next.js SPA guide][spaguide]'s
-`shallow-routing` pattern. **Nothing here is shipped** — it is written down so a
-future attempt starts from the reasoning rather than re-deriving it, the same way
-[instant-navigation.md](./instant-navigation.md) parked (then shipped) its part 2.
+`shallow-routing` pattern.
 
 [spaguide]: https://nextjs.org/docs/app/guides/single-page-applications
+
+> **Update — prototype landed.** `shallowPush` now exists as an exported
+> prototype, with the exact design below: match the armed target by value (trailing
+> slash normalized), skip the loader in the runtime, advance the runtime-owned
+> query with `validate` only, and hold the render like `instant`. It's exercised by
+> the [`shallow-list-filter`](../examples/shallow-list-filter) example (a URL-backed
+> sort/filter list) and pinned by
+> [`e2e/shallow-list-filter.spec.ts`](../e2e/shallow-list-filter.spec.ts), which
+> asserts a shallow sort/filter updates the view + URL with **no loader run and no
+> loading frame**, while an ordinary navigation still runs the loader. The design
+> reasoning below is preserved as what led there; treat "not shipped" framing as
+> historical. Still a prototype — no ESLint enforcement yet, and the open questions
+> at the end stand.
 
 ## TL;DR
 

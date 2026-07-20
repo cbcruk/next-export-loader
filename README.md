@@ -120,8 +120,9 @@ The component never renders a loading state of its own — by the time it mounts
 | `useLoaderPhase()` | Reads the current phase (`'loading' \| 'ready' \| 'error'`) — for progress bars in your app shell. |
 | `<PrefetchLink>` | A `next/link` that warms the destination's queries on hover/focus. |
 | `<LoaderDevtools>` | A floating dev panel logging recent navigations (phase, duration, redirects, errors). |
+| `shallowPush(url)` | Navigate for a view-only URL change (sort/filter/select over loaded data) **without running the loader**. Prototype — see below. |
 
-Exported types: `LoaderContext`, `LoaderFn`, `LoaderPhase`, `NavigationEntry`, `PrefetchableQuery`, `PrefetchLinkProps`, `RedirectOptions`.
+Exported types: `LoaderContext`, `LoaderFn`, `LoaderPhase`, `NavigationEntry`, `PrefetchableQuery`, `PrefetchLinkProps`, `RedirectOptions`, `ShallowPushOptions`.
 
 ### Redirects
 
@@ -146,6 +147,19 @@ import { PrefetchLink } from 'next-export-loader';
 
 On hover or focus, the listed queries are warmed so the destination's loader resolves from cache.
 
+### Shallow navigation (prototype)
+
+When a URL change only re-derives a view over data the loader has **already loaded** — a URL-backed sort, filter, tab, or selection — running the loader again is wasted work. `shallowPush` updates the URL and the params your page reads via `useLoaderQuery`, but skips the loader entirely: no fetch, no loading frame, no `beforeLoad` guard.
+
+```tsx
+import { shallowPush, useLoaderQuery } from 'next-export-loader';
+
+const { sort } = useLoaderQuery<{ sort: 'name' | 'price' }>();
+<button onClick={() => shallowPush('/list?sort=price')}>Sort by price</button>;
+```
+
+Use it only when the new param is valid **by construction** (chosen from already-loaded, already-authorized state) — a param that could fail validation or redirect must use an ordinary navigation so the loader can guard it. It's the static-export analog of the [SPA guide's shallow-routing pattern](https://nextjs.org/docs/app/guides/single-page-applications). See the [`shallow-list-filter`](examples/shallow-list-filter) example and the [design note](docs/shallow-navigation.md) for the full rationale and invariant trade-offs.
+
 ## Data-fetching rules
 
 These keep the cache-hit invariant intact:
@@ -168,6 +182,7 @@ Runnable apps in [`examples/`](examples/), each deployed live to GitHub Pages �
 | [`permission-gated`](examples/permission-gated) | [demo](https://cbcruk.github.io/next-export-loader/permission-gated/) | Permission-based guards over a router-agnostic core: guard factory, redirect-return, 3-state session, token refresh |
 | [`dynamic-routes`](examples/dynamic-routes) | [demo](https://cbcruk.github.io/next-export-loader/dynamic-routes/) | Query-param routes, `errorFallback` on a failed loader |
 | [`search-with-suggest`](examples/search-with-suggest) | [demo](https://cbcruk.github.io/next-export-loader/search-with-suggest/) | Per-query keys and search-driven navigation races |
+| [`shallow-list-filter`](examples/shallow-list-filter) | [demo](https://cbcruk.github.io/next-export-loader/shallow-list-filter/) | URL-backed sort/filter via `shallowPush` — view-only changes that skip the loader (prototype) |
 
 The demos are published by [`.github/workflows/deploy-examples.yml`](.github/workflows/deploy-examples.yml) on every push to `main`. Each example is built as a standalone `output: 'export'` site under its own sub-path. **One-time setup:** in the repo's **Settings → Pages**, set **Source** to **GitHub Actions** — no secrets or tokens needed. Run the examples locally with `pnpm --filter example-basic-list-detail dev`.
 

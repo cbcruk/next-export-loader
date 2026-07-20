@@ -175,6 +175,21 @@ Next.js 16.3의 "instant navigation" 야드스틱(자체 loading 프레임이 �
 <PrefetchLink href="/items?id=2" loader={itemsLoader}>Zero-drift</PrefetchLink>
 ```
 
+### `shallowPush(url, options?)` (실험적 / prototype)
+
+view-only URL 변경 — 이미 loader가 로드한 데이터 위의 정렬·필터·탭·선택 — 을 **loader 실행 없이** 반영한다. URL과 `useLoaderQuery`가 읽는 param은 갱신되지만(`validate`는 실행되어 타입 유지) fetch도, fallback도, `beforeLoad` 가드도 없다. SPA 가이드의 shallow-routing을 `output: 'export'`에서 재현한 것.
+
+새 param이 **구성상 유효**할 때만 쓴다(이미 로드·인가된 상태에서 고른 값). 검증에 실패하거나 redirect가 필요한 param은 일반 navigation으로 loader가 가드해야 한다. 대상 페이지는 반드시 `useLoaderQuery`로 param을 읽어야 한다(`useRouter().query` 금지) — runtime이 `validate` 전까지 새 param을 감추기 때문. 같은 컴포넌트가 이미 `ready`일 때만 shallow로 처리되고, 아니면 full navigation으로 안전하게 degrade한다.
+
+```tsx
+import { shallowPush, useLoaderQuery } from 'next-export-loader';
+
+const { sort } = useLoaderQuery<{ sort: 'name' | 'price' }>();
+<button onClick={() => shallowPush('/list?sort=price')}>Sort by price</button>
+```
+
+`beforeLoad` 가드를 건너뛰므로 invariant #3와 긴장 관계에 있다(그래서 opt-in + "가드 불필요" 계약). 프로토타입: [`examples/shallow-list-filter`](examples/shallow-list-filter)로 동작, [`e2e/shallow-list-filter.spec.ts`](e2e/shallow-list-filter.spec.ts)로 고정. 설계·트레이드오프는 [docs/shallow-navigation.md](docs/shallow-navigation.md).
+
 ## 페이지에서의 사용 모습
 
 ```tsx
@@ -243,7 +258,9 @@ next-export-loader/
 │   ├── basic-list-detail/               ← 메인 예시 (첫 아이템 default selected)
 │   ├── search-with-suggest/             ← searchParam-driven query
 │   ├── auth-gated/                      ← redirect 패턴
-│   └── dynamic-routes/                  ← query-param 페이지의 errorFallback
+│   ├── permission-gated/                ← 권한 가드 (router-agnostic core)
+│   ├── dynamic-routes/                  ← query-param 페이지의 errorFallback
+│   └── shallow-list-filter/             ← shallowPush: loader-free view 변경 (prototype)
 │
 ├── e2e/                                 ← Playwright (정적 export 대상)
 │   ├── *.spec.ts
