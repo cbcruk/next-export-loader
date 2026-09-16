@@ -160,6 +160,44 @@ const { sort } = useLoaderQuery<{ sort: 'name' | 'price' }>();
 
 Use it only when the new param is valid **by construction** (chosen from already-loaded, already-authorized state) — a param that could fail validation or redirect must use an ordinary navigation so the loader can guard it. It's the static-export analog of the [SPA guide's shallow-routing pattern](https://nextjs.org/docs/app/guides/single-page-applications). See the [`shallow-list-filter`](examples/shallow-list-filter) example and the [design note](docs/shallow-navigation.md) for the full rationale and invariant trade-offs.
 
+### Devframe hub panel (experimental)
+
+If you use [devframe](https://devfra.me), the navigation log can live in a devframe hub dock instead of the floating `<LoaderDevtools>` panel. `<LoaderDevtools>` stays the zero-dependency option.
+
+The hub is baked as static files into `public/__devframes/`, so it needs no server or API route and works under `output: 'export'`. The page script talks to the panel over devframe's in-page channel.
+
+```bash
+pnpm add devframe
+pnpm add -D next-export-loader-devframe
+```
+
+```jsonc
+// package.json — bake the hub before dev, remove it before a production build
+"predev": "next-export-loader-devframe build",
+"prebuild": "next-export-loader-devframe clean"
+```
+
+```js
+// next.config.js — lets `next dev` serve the hub's directory URLs
+const { withLoaderDevframe } = require('next-export-loader-devframe/next');
+
+module.exports = withLoaderDevframe({ output: 'export', trailingSlash: true });
+```
+
+```tsx
+// pages/_app.tsx — must run in the app bundle to share the devtools store
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  void import('next-export-loader/devframe').then((m) => m.mountLoaderPageScript());
+}
+
+// pages/_document.tsx — inside <body>
+{process.env.NODE_ENV === 'development' && (
+  <script type="module" src="/__devframes/embedded.js" />
+)}
+```
+
+Everything is gated to development: the production export contains no hub files, page script, or dock script. See the [`devframe-hub`](examples/devframe-hub) example.
+
 ## Data-fetching rules
 
 These keep the cache-hit invariant intact:
@@ -183,6 +221,7 @@ Runnable apps in [`examples/`](examples/), each deployed live to GitHub Pages �
 | [`dynamic-routes`](examples/dynamic-routes) | [demo](https://cbcruk.github.io/next-export-loader/dynamic-routes/) | Query-param routes, `errorFallback` on a failed loader |
 | [`search-with-suggest`](examples/search-with-suggest) | [demo](https://cbcruk.github.io/next-export-loader/search-with-suggest/) | Per-query keys and search-driven navigation races |
 | [`shallow-list-filter`](examples/shallow-list-filter) | [demo](https://cbcruk.github.io/next-export-loader/shallow-list-filter/) | URL-backed sort/filter via `shallowPush` — view-only changes that skip the loader (prototype) |
+| [`devframe-hub`](examples/devframe-hub) | — (dev only) | Navigation log in a devframe hub dock via `next-export-loader-devframe` (experimental) |
 
 The demos are published by [`.github/workflows/deploy-examples.yml`](.github/workflows/deploy-examples.yml) on every push to `main`. Each example is built as a standalone `output: 'export'` site under its own sub-path. **One-time setup:** in the repo's **Settings → Pages**, set **Source** to **GitHub Actions** — no secrets or tokens needed. Run the examples locally with `pnpm --filter example-basic-list-detail dev`.
 
@@ -200,8 +239,8 @@ Pre-1.0 (`0.x`) — the API may change between minor versions until `1.0`. Built
 ## Development
 
 ```bash
-pnpm build          # build the library (tsup, ESM + CJS)
-pnpm typecheck      # type-check the library
+pnpm build          # build the packages (tsup)
+pnpm typecheck      # type-check the packages
 pnpm typecheck:e2e  # type-check the e2e suite
 pnpm test           # unit tests (node:test)
 pnpm test:e2e       # Playwright e2e against the static export
