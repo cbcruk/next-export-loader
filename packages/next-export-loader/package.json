@@ -12,6 +12,10 @@
     "./eslint-plugin": {
       "import": "./dist/eslint-plugin.js",
       "require": "./dist/eslint-plugin.cjs"
+    },
+    "./devframe": {
+      "import": "./dist/devframe.js",
+      "require": "./dist/devframe.cjs"
     }
   },
   "main": "./dist/index.cjs",
@@ -29,13 +33,15 @@
     "@tanstack/react-query": ">=5",
     "next": ">=13",
     "react": ">=18",
-    "react-dom": ">=18"
+    "react-dom": ">=18",
+    "devframe": ">=1"
   },
   "devDependencies": {
     "@tanstack/react-query": "^5.62.0",
     "@types/node": "^25.9.1",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
+    "devframe": "1.0.0",
     "next": "^14.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
@@ -50,5 +56,10 @@
     "loader",
     "tanstack-query"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "peerDependenciesMeta": {
+    "devframe": {
+      "optional": true
+    }
+  }
 }

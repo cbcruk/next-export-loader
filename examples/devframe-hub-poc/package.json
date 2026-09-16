@@ -1,0 +1,28 @@
+{
+  "name": "example-devframe-hub-poc",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "build:devframe": "node scripts/build-devframe.mjs"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.62.0",
+    "next": "^14.2.0",
+    "next-export-loader": "workspace:*",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0"
+  },
+  "devDependencies": {
+    "@devframes/hub": "1.0.0",
+    "@devframes/hub-ui": "1.0.0",
+    "@types/node": "^25.9.1",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "devframe": "1.0.0",
+    "esbuild": "^0.25.12",
+    "typescript": "^5.6.0"
+  }
+}
