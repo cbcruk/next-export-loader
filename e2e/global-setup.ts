@@ -7,12 +7,12 @@ import { repoRoot } from './utils';
 const execAsync = promisify(exec);
 
 /**
- * Builds the library and every example's static export (`out/`) up front, so the
+ * Builds the packages and every example's static export (`out/`) up front, so the
  * static file servers the specs spin up just serve pre-built output — no
  * compilation at test time, and no two workers writing the same `out/`.
  */
 export default async function globalSetup(): Promise<void> {
-  await execAsync('pnpm --filter next-export-loader build', { cwd: repoRoot });
+  await execAsync('pnpm build', { cwd: repoRoot });
 
   const examplesDir = join(repoRoot, 'examples');
   const examples = readdirSync(examplesDir, { withFileTypes: true })

@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { LoaderRuntime, useLoaderPhase } from 'next-export-loader';
 
-if (typeof window !== 'undefined') {
+// Streams loader navigations to the devframe hub dock. Development only, and
+// lazily imported so devframe never reaches the production bundle.
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   void import('next-export-loader/devframe').then((devframe) =>
     devframe.mountLoaderPageScript(),
   );

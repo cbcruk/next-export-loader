@@ -1,10 +1,10 @@
 {
   "private": true,
   "scripts": {
-    "build": "pnpm --filter next-export-loader build",
-    "typecheck": "pnpm --filter next-export-loader typecheck",
+    "build": "pnpm -r --filter \"./packages/*\" build",
+    "typecheck": "pnpm -r --filter \"./packages/*\" typecheck",
     "typecheck:e2e": "tsc -p e2e/tsconfig.json",
-    "test": "pnpm --filter next-export-loader test",
+    "test": "pnpm -r --filter \"./packages/*\" test",
     "test:e2e": "playwright test"
   },
   "devDependencies": {
