@@ -112,13 +112,29 @@ class DevtoolsStore {
   }
 }
 
-let store: DevtoolsStore | null = null;
+const STORE_KEY = Symbol.for('next-export-loader.devtools-store');
 
-export function enableDevtools(): DevtoolsStore {
-  if (!store) store = new DevtoolsStore();
-  return store;
+interface StoreRegistry {
+  [STORE_KEY]?: DevtoolsStore;
 }
 
+const registry = globalThis as StoreRegistry;
+
+/**
+ * Pinned on `globalThis` so every bundle copy (ESM/CJS entries, separately
+ * loaded subpaths) records into and reads from the same instance.
+ */
+export function enableDevtools(): DevtoolsStore {
+  registry[STORE_KEY] ??= new DevtoolsStore();
+  return registry[STORE_KEY];
+}
+
+/**
+ * Development builds record from the first navigation, so a devtools surface
+ * that attaches late still sees the initial page load. Production builds only
+ * record once something calls {@link enableDevtools}.
+ */
 export function getDevtoolsStore(): DevtoolsStore | null {
-  return store;
+  if (process.env.NODE_ENV !== 'production') return enableDevtools();
+  return registry[STORE_KEY] ?? null;
 }

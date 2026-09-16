@@ -190,6 +190,61 @@ const { sort } = useLoaderQuery<{ sort: 'name' | 'price' }>();
 
 `beforeLoad` 가드를 건너뛰므로 invariant #3와 긴장 관계에 있다(그래서 opt-in + "가드 불필요" 계약). 프로토타입: [`examples/shallow-list-filter`](examples/shallow-list-filter)로 동작, [`e2e/shallow-list-filter.spec.ts`](e2e/shallow-list-filter.spec.ts)로 고정. 설계·트레이드오프는 [docs/shallow-navigation.md](docs/shallow-navigation.md).
 
+### Devframe 연동 (실험적)
+
+`<LoaderDevtools>`의 navigation log를 [devframe](https://devfra.me) Hub의 dock 패널로도 볼 수 있게 한다. `<LoaderDevtools>`를 대체하지 않는다 — Hub 없이 쓰는 zero-dep 경로는 그대로 유지하고, devframe은 Hub를 쓰거나 다른 devtools와 한 dock에 모으고 싶은 사용자를 위한 opt-in이다.
+
+**구조**
+
+| 조각 | 실행 위치 | 제공 |
+|---|---|---|
+| `mountLoaderPageScript()` | 앱 페이지 | `next-export-loader/devframe` (optional peer: `devframe`) |
+| 패널 SPA, `createLoaderDevframe()` | dock iframe / Node | `next-export-loader-devframe` |
+| `buildLoaderHub()` / `cleanLoaderHub()`, CLI | Node (dev 스크립트) | `next-export-loader-devframe` |
+| `withLoaderDevframe(nextConfig)` | `next.config.js` | `next-export-loader-devframe/next` |
+
+- page script는 devtools store를 구독해 `NavigationEntry[]` 스냅샷을 in-page channel shared state로 publish한다(50ms coalesce). 서버 없이 same-origin `postMessage` 핸드셰이크만 쓰므로 `next dev`와 정적 export에서 동일하게 동작한다.
+- **page script는 반드시 앱 번들 안에서 mount한다.** Hub dock의 client script로 로드하면 별도 모듈 인스턴스가 되어 빈 store를 본다.
+- 패널·Hub 빌드는 `devframe`/`@devframes/hub`에 의존하므로 별도 패키지로 분리한다(본체 dependencies 0 원칙).
+
+**Hub 호스팅** — `@devframes/next`는 App Router route handler 전용이라 쓰지 않는다. `buildLoaderHub()`가 `buildHub()`로 Hub를 `public/__devframes/`에 정적으로 굽고, Next가 `public/`을 그대로 서빙한다. API route도 서버도 없다.
+
+```jsonc
+// package.json
+"predev": "next-export-loader-devframe build",
+"prebuild": "next-export-loader-devframe clean"
+```
+
+```js
+// next.config.js
+const { withLoaderDevframe } = require('next-export-loader-devframe/next');
+module.exports = withLoaderDevframe({ output: 'export', trailingSlash: true });
+```
+
+```tsx
+// _app.tsx — dev 전용, lazy import로 운영 번들에서 제외
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  void import('next-export-loader/devframe').then((m) => m.mountLoaderPageScript());
+}
+
+// _document.tsx
+{process.env.NODE_ENV === 'development' && (
+  <script type="module" src="/__devframes/embedded.js" />
+)}
+```
+
+**Invariant 영향**: 없음. page script는 store를 읽기만 하고 navigation lifecycle에 개입하지 않는다.
+
+**설계 결정** (PoC에서 드러난 문제 → 해결):
+
+1. **초기 navigation 누락** — store가 `enableDevtools()` 호출 전엔 기록하지 않아, lazy import된 page script가 직접 진입한 첫 페이지를 놓쳤다. → dev 빌드(`process.env.NODE_ENV !== 'production'`)에서 store를 자동 활성화. 새 API 없음, 운영 빌드에서는 기존처럼 opt-in. store가 최근 50건을 버퍼링하므로 늦게 붙은 page script도 `initialValue`로 받는다.
+2. **CJS에서 store 복제** — tsup CJS는 entry마다 store를 복제한다. → store 인스턴스를 `globalThis[Symbol.for('next-export-loader.devtools-store')]`에 고정.
+3. **`next dev`의 디렉터리 index** — `public/` 파일은 정확한 경로로만 서빙되어 `/__devframes/<id>/`가 404. → `withLoaderDevframe`가 dev에서만 `index.html` rewrite를 추가(기존 rewrites에 병합). `trailingSlash`가 꺼져 있으면 Hub의 상대 경로가 깨지지 않도록 dev에서 `skipTrailingSlashRedirect: true`도 설정. 운영에서는 config를 그대로 반환하므로 `output: 'export'`에 영향 없음.
+4. **운영 빌드 gating** — devframe은 gating을 제공하지 않는다. → Hub는 `predev`에서만 굽고 `prebuild`에서 삭제(약 1.3MB), page script와 `embedded.js` 태그는 dev 조건 뒤. 운영 export에 devframe 흔적이 없음을 확인. 배포된 사이트에서 Hub를 띄우는 opt-in은 후속 과제.
+5. **`componentName` 난독화** — 운영 빌드에서 `o` 같은 이름이 나온다. 기존 `<LoaderDevtools>`와 동일한 한계이며, dev 전용으로 쓰는 한 실사용 영향은 작다.
+
+예시: [`examples/devframe-hub`](examples/devframe-hub).
+
 ## 페이지에서의 사용 모습
 
 ```tsx
@@ -233,26 +288,28 @@ export default function ItemsPage() {
 ```
 next-export-loader/
 ├── packages/
-│   └── next-export-loader/
-│       ├── src/
-│       │   ├── index.ts                 ← public API barrel
-│       │   ├── types.ts                 ← public 도메인 타입 (LoaderContext 등)
-│       │   ├── define-loader.ts
-│       │   ├── redirect-error.ts
-│       │   ├── loader-runtime.tsx       ← <LoaderRuntime>
-│       │   ├── loader-devtools.tsx      ← <LoaderDevtools>
-│       │   ├── prefetch-link.tsx
-│       │   ├── use-loader-phase.ts
-│       │   ├── eslint-plugin.ts         ← no-use-query rule
-│       │   ├── *.test.ts                ← node:test, co-located
-│       │   └── internal/
-│       │       ├── parse-url.ts
-│       │       ├── navigation-id.ts     ← race 방지용
-│       │       ├── devtools-store.ts
-│       │       ├── types.ts             ← internal 전용 타입
-│       │       └── *.test.ts
-│       ├── package.json
-│       └── tsup.config.ts
+│   ├── next-export-loader/
+│   │   ├── src/
+│   │   │   ├── index.ts                 ← public API barrel
+│   │   │   ├── types.ts                 ← public 도메인 타입 (LoaderContext 등)
+│   │   │   ├── define-loader.ts
+│   │   │   ├── redirect-error.ts
+│   │   │   ├── loader-runtime.tsx       ← <LoaderRuntime>
+│   │   │   ├── loader-devtools.tsx      ← <LoaderDevtools>
+│   │   │   ├── devframe/                ← `./devframe` subpath: page script (optional peer: devframe)
+│   │   │   ├── prefetch-link.tsx
+│   │   │   ├── use-loader-phase.ts
+│   │   │   ├── eslint-plugin.ts         ← no-use-query rule
+│   │   │   ├── *.test.ts                ← node:test, co-located
+│   │   │   └── internal/
+│   │   │       ├── parse-url.ts
+│   │   │       ├── navigation-id.ts     ← race 방지용
+│   │   │       ├── devtools-store.ts
+│   │   │       ├── types.ts             ← internal 전용 타입
+│   │   │       └── *.test.ts
+│   │   ├── package.json
+│   │   └── tsup.config.ts
+│   └── devframe/                        ← next-export-loader-devframe: 패널 SPA, Hub 빌드, Next 헬퍼
 │
 ├── examples/
 │   ├── basic-list-detail/               ← 메인 예시 (첫 아이템 default selected)
@@ -260,7 +317,8 @@ next-export-loader/
 │   ├── auth-gated/                      ← redirect 패턴
 │   ├── permission-gated/                ← 권한 가드 (router-agnostic core)
 │   ├── dynamic-routes/                  ← query-param 페이지의 errorFallback
-│   └── shallow-list-filter/             ← shallowPush: loader-free view 변경 (prototype)
+│   ├── shallow-list-filter/             ← shallowPush: loader-free view 변경 (prototype)
+│   └── devframe-hub/                    ← devframe Hub dock 연동
 │
 ├── e2e/                                 ← Playwright (정적 export 대상)
 │   ├── *.spec.ts
@@ -307,6 +365,7 @@ next-export-loader/
 - [x] TanStack Router로의 마이그레이션 가이드 (졸업 경로)
 - [x] `defineLoader` 결과의 search params 타입 추론 강화
 - [x] Playwright e2e (정적 export 대상, invariant별 커버)
+- [x] Devframe 연동 (page script + Hub dock 패널, 실험적)
 
 ## Non-goals
 

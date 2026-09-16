@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { enableDevtools } from './devtools-store';
+import { enableDevtools, getDevtoolsStore } from './devtools-store';
 
 describe('DevtoolsStore', () => {
   const store = enableDevtools();
@@ -95,5 +95,18 @@ describe('DevtoolsStore', () => {
     unsubscribe();
     store.startNavigation(801, '/b', 'B');
     assert.strictEqual(count, 1);
+  });
+
+  it('pins the store on globalThis so every bundle copy shares it', () => {
+    const pinned = (globalThis as Record<symbol, unknown>)[
+      Symbol.for('next-export-loader.devtools-store')
+    ];
+    assert.strictEqual(pinned, store);
+    assert.strictEqual(enableDevtools(), store);
+  });
+
+  it('getDevtoolsStore returns the store outside production builds', () => {
+    assert.notStrictEqual(process.env.NODE_ENV, 'production');
+    assert.strictEqual(getDevtoolsStore(), store);
   });
 });
